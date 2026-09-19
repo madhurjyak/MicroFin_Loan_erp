@@ -15,6 +15,7 @@
             "src": "/(build|css|js|images|assets)/(.*)",
             "dest": "/public/$1/$2"
         },
+        { "handle": "filesystem" },
         {
             "src": "/(.*)",
             "dest": "/api/index.php"
@@ -23,6 +24,7 @@
     "env": {
         "APP_ENV": "production",
         "APP_DEBUG": "false",
+        "ASSET_URL": "/public",
         "CACHE_STORE": "array",
         "CACHE_DRIVER": "array",
         "SESSION_DRIVER": "cookie",
