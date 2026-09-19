@@ -11,16 +11,12 @@
             "config": {
                 "distDir": "public"
             }
-        },
-        {
-            "src": "/public/**",
-            "use": "@vercel/static"
         }
     ],
     "routes": [
         {
             "src": "/(build|css|js|images|assets)/(.*)",
-            "dest": "/public/$1/$2"
+            "dest": "/$1/$2"
         },
         {
             "src": "/(.*)",
