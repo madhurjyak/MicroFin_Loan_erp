@@ -4,19 +4,12 @@
         {
             "src": "api/index.php",
             "use": "vercel-php@0.6.2"
-        },
-        {
-            "src": "package.json",
-            "use": "@vercel/static-build",
-            "config": {
-                "distDir": "public"
-            }
         }
     ],
     "routes": [
         {
             "src": "/(build|css|js|images|assets)/(.*)",
-            "dest": "/$1/$2"
+            "dest": "/public/$1/$2"
         },
         {
             "src": "/(.*)",
