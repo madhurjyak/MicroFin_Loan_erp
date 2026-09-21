@@ -43,6 +43,12 @@
         </a>
     </div>
 
+    @if($applications->isEmpty())
+    <div class="empty-state" style="padding: 40px 20px; text-align: center;">
+        <p style="font-size: 18px; margin-bottom: 8px;">📝 No applications yet</p>
+        <a href="{{ route('los.apply') }}" class="text-link">File your first loan application →</a>
+    </div>
+    @else
     <div class="table-responsive">
         <table id="myAppsTable" class="data-table">
             <thead>
@@ -57,7 +63,7 @@
                 </tr>
             </thead>
             <tbody>
-                @forelse($applications as $app)
+                @foreach($applications as $app)
                 <tr>
                     <td class="font-mono font-medium" style="color: var(--brand-600);">{{ $app->application_no }}</td>
                     <td>
@@ -85,20 +91,15 @@
                     </td>
                     <td class="text-muted">{{ $app->created_at->format('d M Y') }}</td>
                 </tr>
-                @empty
-                <tr>
-                    <td colspan="7" class="empty-state">
-                        <p style="font-size: 18px; margin-bottom: 8px;">📝 No applications yet</p>
-                        <a href="{{ route('los.apply') }}" class="text-link">File your first loan application →</a>
-                    </td>
-                </tr>
-                @endforelse
+                @endforeach
             </tbody>
         </table>
     </div>
+    @endif
 </div>
 
 @push('scripts')
+@if($applications->isNotEmpty())
 <script>
 $(document).ready(function() {
     $('#myAppsTable').DataTable({
@@ -109,5 +110,6 @@ $(document).ready(function() {
     });
 });
 </script>
+@endif
 @endpush
 @endsection
