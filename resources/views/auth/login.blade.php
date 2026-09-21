@@ -267,7 +267,7 @@
             <!-- Demo credentials -->
             <div class="demo-card">
                 <p style="font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 12px 0;">
-                    🔑 Demo Credentials (pwd: <code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; color: var(--brand-600); font-family: monospace;">password</code>)
+                    🔑 Demo Credentials (pwd: <code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; color: var(--brand-600); font-family: monospace; text-transform: lowercase !important; font-variant: normal;">password</code>)
                 </p>
                 <div style="display: flex; flex-direction: column; gap: 8px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; font-size: 14px;">
