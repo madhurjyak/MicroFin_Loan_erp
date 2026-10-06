@@ -30,6 +30,7 @@
         "SESSION_DRIVER": "cookie",
         "QUEUE_CONNECTION": "sync",
         "LOG_CHANNEL": "stderr",
-        "VIEW_COMPILED_PATH": "/tmp"
+        "VIEW_COMPILED_PATH": "/tmp/storage/framework/views",
+        "LARAVEL_STORAGE_PATH": "/tmp/storage"
     }
 }

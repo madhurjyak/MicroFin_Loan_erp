@@ -1,14 +1,27 @@
 <?php
-// Ensure Vercel's temporary directory is used for all cached and compiled files
-putenv('VIEW_COMPILED_PATH=/tmp/views');
-putenv('APP_CONFIG_CACHE=/tmp/config.php');
-putenv('APP_EVENTS_CACHE=/tmp/events.php');
-putenv('APP_PACKAGES_CACHE=/tmp/packages.php');
-putenv('APP_ROUTES_CACHE=/tmp/routes.php');
-putenv('APP_SERVICES_CACHE=/tmp/services.php');
 
-if (!is_dir('/tmp/views')) {
-    mkdir('/tmp/views', 0777, true);
+// Direct storage and cache paths to Vercel's writable /tmp directory
+$_ENV['LARAVEL_STORAGE_PATH'] = '/tmp/storage';
+$_SERVER['LARAVEL_STORAGE_PATH'] = '/tmp/storage';
+putenv('LARAVEL_STORAGE_PATH=/tmp/storage');
+
+$_ENV['VIEW_COMPILED_PATH'] = '/tmp/storage/framework/views';
+$_SERVER['VIEW_COMPILED_PATH'] = '/tmp/storage/framework/views';
+putenv('VIEW_COMPILED_PATH=/tmp/storage/framework/views');
+
+// Ensure necessary temporary directories exist
+$directories = [
+    '/tmp/storage/framework/cache/data',
+    '/tmp/storage/framework/sessions',
+    '/tmp/storage/framework/views',
+    '/tmp/storage/logs',
+    '/tmp/bootstrap/cache',
+];
+
+foreach ($directories as $dir) {
+    if (!is_dir($dir)) {
+        mkdir($dir, 0777, true);
+    }
 }
 
 require __DIR__ . '/../public/index.php';
