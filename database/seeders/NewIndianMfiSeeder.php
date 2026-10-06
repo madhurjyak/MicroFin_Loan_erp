@@ -13,9 +13,12 @@ use App\Models\OtsProposal;
 use App\Models\RecoveryCallLog;
 use App\Models\RecoveryCase;
 use App\Models\RepaymentSchedule;
+use App\Models\SavingsAccount;
+use App\Models\SavingsSchedule;
 use App\Models\StatutoryNotice;
 use App\Models\User;
 use App\Services\AmortizationService;
+use App\Services\SavingsOriginationService;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -35,10 +38,12 @@ use Illuminate\Support\Facades\Hash;
 class NewIndianMfiSeeder extends Seeder
 {
     private AmortizationService $amortization;
+    private SavingsOriginationService $savingsService;
 
-    public function __construct(AmortizationService $amortization)
+    public function __construct(AmortizationService $amortization, SavingsOriginationService $savingsService)
     {
         $this->amortization = $amortization;
+        $this->savingsService = $savingsService;
     }
 
     public function run(): void
@@ -51,6 +56,8 @@ class NewIndianMfiSeeder extends Seeder
         DB::table('recovery_call_logs')->truncate();
         DB::table('recovery_cases')->truncate();
         DB::table('collection_transactions')->truncate();
+        DB::table('savings_schedules')->truncate();
+        DB::table('savings_accounts')->truncate();
         DB::table('repayment_schedules')->truncate();
         DB::table('loans')->truncate();
         DB::table('customers')->truncate();
@@ -202,6 +209,126 @@ class NewIndianMfiSeeder extends Seeder
                 'ifsc_code'               => 'SBIN0' . rand(10000, 99999),
             ]);
         }
+
+        // ────────────────────────────────────────────────────────────────────
+        // 3.5 SAVINGS ACCOUNTS (All 25 members — weekly RD @ ₹100 or ₹200)
+        // ────────────────────────────────────────────────────────────────────
+        $this->command->info('  → Creating 25 RD Savings Accounts...');
+        $today    = Carbon::today();
+        $savingsAccounts = [];
+
+        // RD specs per member index: [deposit_amount, interest_rate, tenure_months, months_running, pct_paid]
+        $rdSpecs = [
+            [100, 5.50, 12, 10, 85],  // 0
+            [100, 5.50, 12,  8, 70],  // 1
+            [200, 5.75, 24,  6, 25],  // 2
+            [100, 5.50, 12, 11, 90],  // 3
+            [150, 5.50, 18,  5, 28],  // 4
+            [100, 5.50, 12,  9, 75],  // 5
+            [200, 5.75, 24, 12, 50],  // 6
+            [100, 5.50, 12,  7, 58],  // 7
+            [100, 5.50, 12,  3, 25],  // 8
+            [200, 5.75, 18, 10, 55],  // 9
+            [100, 5.50, 12, 11, 80],  // 10
+            [100, 5.50, 12,  9, 65],  // 11
+            [150, 5.50, 18, 14, 60],  // 12
+            [100, 5.50, 24, 16, 55],  // 13
+            [200, 5.75, 18, 18, 70],  // 14
+            [100, 5.50, 24, 20, 65],  // 15
+            [100, 5.50, 18, 22, 75],  // 16
+            [200, 5.75, 24, 25, 75],  // 17
+            [100, 5.50, 12,  8, 65],  // 18
+            [150, 5.50, 18,  9, 50],  // 19
+            [100, 5.50, 12,  7, 58],  // 20
+            [200, 5.75, 24, 10, 42],  // 21
+            [100, 5.50, 12,  6, 50],  // 22
+            [100, 5.50, 12,  5, 42],  // 23
+            [150, 5.50, 18,  7, 39],  // 24
+        ];
+
+        foreach ($customers as $idx => $customer) {
+            [$depAmt, $rate, $tenureMonths, $monthsRunning, $pctPaid] = $rdSpecs[$idx];
+
+            $openingDate = $today->copy()->subMonths($monthsRunning)->startOfMonth();
+            $maturityDate = $openingDate->copy()->addMonths($tenureMonths);
+
+            // Calculate number of weekly installments
+            $totalInstallments = (int) round($tenureMonths * 52 / 12);
+            $paidInstallments  = (int) round($totalInstallments * $pctPaid / 100);
+
+            $maturityAmount = $this->savingsService->calculateMaturityAmount(
+                $depAmt, $rate, $tenureMonths, 'weekly'
+            );
+
+            // Generate account number manually for seeder
+            $accountNo = 'RD' . $openingDate->format('Y') . str_pad($idx + 1, 6, '0', STR_PAD_LEFT);
+
+            $sa = SavingsAccount::create([
+                'customer_id'               => $customer->id,
+                'account_no'                => $accountNo,
+                'account_type'              => 'rd',
+                'deposit_amount'            => $depAmt,
+                'interest_rate'             => $rate,
+                'tenure'                    => $tenureMonths,
+                'frequency'                 => 'weekly',
+                'opening_date'              => $openingDate->toDateString(),
+                'maturity_date'             => $maturityDate->toDateString(),
+                'status'                    => 'active',
+                'total_principal_collected' => $paidInstallments * $depAmt,
+                'total_interest_accrued'    => 0,
+                'maturity_amount'           => $maturityAmount,
+            ]);
+
+            // Generate schedule
+            for ($i = 1; $i <= $totalInstallments; $i++) {
+                $dueDate = $openingDate->copy()->addWeeks($i);
+                $isPaid  = $i <= $paidInstallments;
+                $isMissed = !$isPaid && $dueDate->lt($today) && in_array($idx, [10, 11, 14, 15, 16, 17]) && $i > $paidInstallments && $i <= $paidInstallments + 3;
+
+                SavingsSchedule::create([
+                    'savings_account_id' => $sa->id,
+                    'installment_no'     => $i,
+                    'due_date'           => $dueDate->toDateString(),
+                    'amount_expected'    => $depAmt,
+                    'amount_collected'   => $isPaid ? $depAmt : 0,
+                    'interest_accrued'   => $isPaid ? round($depAmt * ($rate / 100 / 52), 2) : 0,
+                    'status'             => $isPaid ? 'paid' : ($isMissed ? 'missed' : 'pending'),
+                    'collection_date'    => $isPaid ? $dueDate->toDateString() : null,
+                ]);
+
+                // Record collection transactions for paid installments
+                if ($isPaid) {
+                    $modeOptions = ['cash', 'upi_qr', 'nach'];
+                    CollectionTransaction::create([
+                        'loan_id'             => null,
+                        'schedule_id'         => null,
+                        'savings_account_id'  => $sa->id,
+                        'savings_schedule_id' => null,
+                        'transaction_type'    => 'savings_deposit',
+                        'receipt_no'          => 'RDRCP' . strtoupper(substr(md5($sa->id . '_' . $i), 0, 8)),
+                        'amount_collected'    => $depAmt,
+                        'collection_date'     => $dueDate->toDateString(),
+                        'collected_by'        => $customer->group->center->field_officer ?? 'Field Officer',
+                        'payment_mode'        => $modeOptions[array_rand($modeOptions)],
+                        'remarks'             => "RD Deposit #{$i}: ₹{$depAmt}",
+                    ]);
+                }
+            }
+
+            $savingsAccounts[] = $sa;
+        }
+
+        // Compute interest for all savings accounts
+        foreach ($savingsAccounts as $sa) {
+            $sa->refresh();
+            $periodicRate = (float) $sa->interest_rate / 100 / 52;
+            $paidCount = SavingsSchedule::where('savings_account_id', $sa->id)->where('status','paid')->count();
+            $n = SavingsSchedule::where('savings_account_id', $sa->id)->count();
+            $interestAccrued = (float) $sa->deposit_amount * $periodicRate * ($paidCount * ($n - $paidCount / 2));
+            $sa->update(['total_interest_accrued' => round(max(0, $interestAccrued), 2)]);
+        }
+
+        $this->command->info('  → 25 RD accounts created with schedules and paid history');
 
         // ────────────────────────────────────────────────────────────────────
         // 4. LOANS + REPAYMENT SCHEDULES
@@ -583,6 +710,7 @@ class NewIndianMfiSeeder extends Seeder
         }
 
         $this->command->info('✅ Seeded: 3 Users, 3 Centers, 6 Groups, 25 Customers, 18 Loans');
+        $this->command->info('   → 25 RD Savings Accounts with schedules');
         $this->command->info('   → 10 healthy | 4 SMA-0/1 | 2 SMA-2 | 2 NPA');
         $this->command->info('   → 4 Statutory Notices | 1 OTS Proposal | 11 Call Logs');
         $this->command->info('   → 5 Loan Applications (2 submitted, 1 rejected, 2 approved)');
