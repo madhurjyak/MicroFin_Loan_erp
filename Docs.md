@@ -23,11 +23,12 @@
    - [Workflow 1: Loan Origination System (LOS) Pipeline](#workflow-1-loan-origination-system-los-pipeline)
    - [Workflow 2: Customer Onboarding & KYC Compliance](#workflow-2-customer-onboarding--kyc-compliance)
    - [Workflow 3: Loan Origination & Reducing-Balance Amortization](#workflow-3-loan-origination--reducing-balance-amortization)
-   - [Workflow 4: Kendra Collection Day Sheet (CDS) Processing](#workflow-4-kendra-collection-day-sheet-cds-processing)
-   - [Workflow 5: The Indian Banking Repayment Waterfall](#workflow-5-the-indian-banking-repayment-waterfall)
-   - [Workflow 6: EOD Batch Processing (DPD Recalculation & Asset Classification)](#workflow-6-eod-batch-processing-dpd-recalculation--asset-classification)
-   - [Workflow 7: Delinquency Engagement & Calling Console (RBI Contact Hours)](#workflow-7-delinquency-engagement--calling-console-rbi-contact-hours)
-   - [Workflow 8: Statutory Legal Escalation & One-Time Settlement (OTS)](#workflow-8-statutory-legal-escalation--one-time-settlement-ots)
+   - [Workflow 4: Savings Management System (SMS) & Recurring Deposits](#workflow-4-savings-management-system-sms--recurring-deposits)
+   - [Workflow 5: Unified Kendra Collection Day Sheet (CDS) Processing](#workflow-5-unified-kendra-collection-day-sheet-cds-processing)
+   - [Workflow 6: The Indian Banking Repayment Waterfall](#workflow-6-the-indian-banking-repayment-waterfall)
+   - [Workflow 7: EOD Batch Processing (DPD Recalculation & Asset Classification)](#workflow-7-eod-batch-processing-dpd-recalculation--asset-classification)
+   - [Workflow 8: Delinquency Engagement & Calling Console (RBI Contact Hours)](#workflow-8-delinquency-engagement--calling-console-rbi-contact-hours)
+   - [Workflow 9: Statutory Legal Escalation & One-Time Settlement (OTS)](#workflow-9-statutory-legal-escalation--one-time-settlement-ots)
 5. [Component Deep Dive](#5-component-deep-dive)
    - [Domain Services Layer](#domain-services-layer)
    - [Controller & HTTP Presentation Layer](#controller--http-presentation-layer)
@@ -44,27 +45,27 @@
 ## 1. System Overview & ERP Fundamentals
 
 ### Core Objectives
-An Enterprise Resource Planning (ERP) platform in lending is fundamentally a **stateful transactional ledger** coupled with **regulatory policy engines**. The **IndiaLend Pro** platform bridges two distinct yet tightly integrated domains:
+An Enterprise Resource Planning (ERP) platform in lending is fundamentally a **stateful transactional ledger** coupled with **regulatory policy engines**. The **IndiaLend Pro** platform bridges three distinct yet tightly integrated domains:
 
-1. **Loan Management System (LMS)**: Originates credit facilities, generates legally compliant amortization schedules, tracks weekly/monthly collection meetings across rural centers, and handles payment appropriations.
-2. **Delinquency Recovery Management System (DRMS)**: Monitors credit portfolio degradation, tracks Days Past Due (DPD), manages regulatory asset reclassifications (SMA and NPA), governs field/telecalling recovery operations under strict ethical time-locks, and drives legal notice dispatch and One-Time Settlement (OTS) workouts.
+1. **Loan Origination System (LOS)**: Manages customer onboarding, KYC, document verification, and multi-tier approval pipelines.
+2. **Loan & Savings Management System (LMS & SMS)**: Originates credit facilities, calculates deposit interest for Recurring Deposits (RD), generates legally compliant amortization/savings schedules, tracks weekly/monthly collection meetings via unified Kendra CDS, and handles payment appropriations.
+3. **Delinquency Recovery Management System (DRMS)**: Monitors credit portfolio degradation, tracks Days Past Due (DPD), manages regulatory asset reclassifications (SMA and NPA), governs field/telecalling recovery operations under strict ethical time-locks, and drives legal notice dispatch and OTS workouts.
 
 ```
-        ┌────────────────────────────────────────────────────────┐
-        │                   IndiaLend Pro ERP                    │
-        └───────────────────────────┬────────────────────────────┘
-                                    │
-          ┌─────────────────────────┼───────────────────────────┐
-          ▼                         ▼                           ▼
-┌──────────────────┐     ┌────────────────────┐      ┌───────────────────┐
-│ LOS (Origination)│     │ LMS (Performing)   │      │ DRMS (Delinquent) │
-├──────────────────┤     ├────────────────────┤      ├───────────────────┤
-│ • Agent Sourcing │     │ • Center & Group   │      │ • DPD Aging Engine│
-│ • App Drafting   │     │ • KYC & FOIR       │      │ • SMA/NPA Buckets │
-│ • Doc Verify     │     │ • Reducing-Bal     │      │ • Contact Log     │
-│ • Manager Review │     │ • Kendra CDS       │      │ • §138 NI Legal   │
-│ • Sanction/Reject│     │ • 5-Stage Waterfall│      │ • OTS Calculator  │
-└──────────────────┘     └────────────────────┘      └───────────────────┘
+        ┌────────────────────────────────────────────────────────────────────────┐
+        │                          IndiaLend Pro ERP                             │
+        └───────┬─────────────────────────┬──────────────────────────┬───────────┘
+                │                         │                          │
+      ┌─────────┴───────┐       ┌─────────┴────────┐       ┌─────────┴─────────┐
+      ▼                 ▼       ▼                  ▼       ▼                   ▼
+┌───────────┐     ┌───────────┐     ┌────────────┐     ┌─────────────┐
+│    LOS    │     │    LMS    │     │    SMS     │     │    DRMS     │
+├───────────┤     ├───────────┤     ├────────────┤     ├─────────────┤
+│• Sourcing │     │• JLG KYC  │     │• Acc (RD)  │     │• DPD Aging  │
+│• App Draft│     │• Amortize │     │• Interest  │     │• SMA/NPA    │
+│• Doc Check│     │• CDS Bulk │     │• Unified CDS│    │• Call Log   │
+│• Sanction │     │• Waterfall│     │• Deposits  │     │• Legal / OTS│
+└───────────┘     └───────────┘     └────────────┘     └─────────────┘
 ```
 
 ### The Indian Microfinance Operating Model (JLG / Kendra)
@@ -162,6 +163,10 @@ erDiagram
     LOANS ||--o{ STATUTORY_NOTICES : dispatches
     LOANS ||--o{ OTS_PROPOSALS : negotiates
     CUSTOMERS ||--o{ COLLECTION_TRANSACTIONS : acts_as_peer_payer
+    CUSTOMERS ||--o{ SAVINGS_ACCOUNTS : holds
+    SAVINGS_ACCOUNTS ||--o{ SAVINGS_SCHEDULES : plans
+    SAVINGS_ACCOUNTS ||--o{ COLLECTION_TRANSACTIONS : deposits
+    SAVINGS_SCHEDULES ||--o{ COLLECTION_TRANSACTIONS : fulfilled_by
 
     USERS {
         bigint id PK
@@ -245,13 +250,40 @@ erDiagram
 
     COLLECTION_TRANSACTIONS {
         bigint id PK
+        enum transaction_type
         bigint loan_id FK
         bigint schedule_id FK
+        bigint savings_account_id FK
+        bigint savings_schedule_id FK
         string receipt_no UK
         decimal amount_collected
         date collection_date
         enum payment_mode
         bigint peer_payer_customer_id FK
+    }
+
+    SAVINGS_ACCOUNTS {
+        bigint id PK
+        bigint customer_id FK
+        string account_no UK
+        enum account_type
+        decimal deposit_amount
+        decimal interest_rate
+        int tenure
+        enum status
+        decimal total_principal_collected
+        decimal total_interest_accrued
+    }
+
+    SAVINGS_SCHEDULES {
+        bigint id PK
+        bigint savings_account_id FK
+        int installment_no
+        date due_date
+        decimal amount_expected
+        decimal amount_collected
+        decimal interest_accrued
+        enum status
     }
 
     RECOVERY_CASES {
@@ -315,6 +347,7 @@ loan_erp/
 │   │   ├── RecoveryController.php      # Delinquency console & ethical call logging
 │   │   ├── LegalController.php         # Statutory notices (§138, §25) & OTS engine
 │   │   ├── LosController.php           # Loan origination & underwriting pipeline
+│   │   ├── SavingsController.php       # Savings accounts (RD/FD) & unified collections
 │   │   ├── AdminController.php         # User management, roles, branches & config
 │   │   └── AuthController.php          # Authentication login/logout logic
 │   ├── Models/
@@ -330,11 +363,16 @@ loan_erp/
 │   │   ├── RecoveryCallLog.php         # Customer interactions, PTP commitments
 │   │   ├── StatutoryNotice.php         # Formal legal letters & postal tracking
 │   │   ├── OtsProposal.php             # Settlement haircut calculations & governance
+│   │   ├── SavingsAccount.php          # Savings/Deposit facilities (RD)
+│   │   ├── SavingsSchedule.php         # Periodic deposit obligations
 │   │   └── User.php                    # Internal system operators, roles & branches
 │   ├── Providers/
 │   │   └── AppServiceProvider.php      # App service bootstrapping
 │   └── Services/
 │       ├── AmortizationService.php     # Reducing-balance math, FOIR & RBI limits
+│       ├── SavingsOriginationService.php # Deposit account opening & schedules
+│       ├── SavingsInterestCalculator.php # Accrual math for RD balances
+│       ├── CollectionLedgerService.php # Unified posting (Loans + Savings)
 │       └── RepaymentWaterfallService.php # 5-stage legal appropriation algorithm
 ├── database/
 │   ├── migrations/                     # 10 domain schema definitions
@@ -358,8 +396,12 @@ loan_erp/
 │       │   ├── my_applications.blade.php # View personal applications (agents)
 │       │   ├── pipeline.blade.php      # Manager queue & sanctioning workflow
 │       │   └── review.blade.php        # Deep review & document verification
+│       ├── sms/
+│       │   ├── index.blade.php         # Savings directory & active accounts
+│       │   ├── create.blade.php        # Open new Recurring Deposit form
+│       │   └── show.blade.php          # Savings ledger & schedule tracking
 │       ├── lms/
-│       │   ├── cds.blade.php           # Kendra Collection Day Sheet
+│       │   ├── cds.blade.php           # Unified Collection Day Sheet (Loans + Savings)
 │       │   └── loan_ledger.blade.php   # Account ledger & Collect Repayment modal
 │       ├── recovery/
 │       │   ├── console.blade.php       # Delinquency console & Log Contact modal
@@ -454,7 +496,14 @@ Given principal $P$, annual rate $R$, and frequency (weekly or monthly):
    $$\text{Principal Due}_n = \text{Balance}_{n-1}$$
    This guarantees that closing balance reaches exactly ₹0.00.
 
-### Workflow 4: Kendra Collection Day Sheet (CDS) Processing
+### Workflow 4: Savings Management System (SMS) & Recurring Deposits
+IndiaLend Pro now operates as a complete Core Banking System, allowing branches to originate deposit facilities alongside loans.
+
+1. **Origination**: Through `/sms/savings/create`, officers can open a Recurring Deposit (RD) or Fixed Deposit (FD) for a verified JLG customer.
+2. **Scheduling**: [`SavingsOriginationService`](file:///c:/xampp/htdocs/loan_erp/app/Services/SavingsOriginationService.php) generates a `SavingsSchedule`, outlining exactly when periodic deposits are expected.
+3. **Interest Accrual**: The `SavingsInterestCalculator` handles periodic capitalization of interest onto the `total_interest_accrued` ledger.
+
+### Workflow 5: Unified Kendra Collection Day Sheet (CDS) Processing
 Field Officers conduct Kendra meetings weekly. The CDS serves as their field audit sheet.
 
 1. Field Officer accesses `/lms/cds` with `center_id` and `collection_date`.
@@ -464,7 +513,7 @@ Field Officers conduct Kendra meetings weekly. The CDS serves as their field aud
    - Active loans and repayment schedules due on or before the selected date with status `['pending', 'partial', 'overdue']`.
 3. The officer collects cash/UPI from each member. If a member is short, a peer borrower in the group can contribute on their behalf, recorded in `peer_payer_customer_id`.
 
-### Workflow 5: The Indian Banking Repayment Waterfall
+### Workflow 6: The Indian Banking Repayment Waterfall
 Payment appropriation in Indian banking is strictly regulated to protect borrowers from predatory debt spirals. An incoming payment cannot be credited arbitrarily to principal to reduce interest income, nor can it be consumed entirely by uncapitalised penalties before servicing basic interest.
 
 [`RepaymentWaterfallService::apply()`](file:///c:/xampp/htdocs/loan_erp/app/Services/RepaymentWaterfallService.php#L37-L157) executes this exact 5-tier waterfall across the oldest unpaid schedules first:
@@ -493,7 +542,7 @@ flowchart TD
 
 If total paid $\ge (\text{Total Due} + \text{Penal} + \text{GST} - 0.01)$, schedule status transitions to `paid`. If partially covered, status becomes `partial`.
 
-### Workflow 6: EOD Batch Processing (DPD Recalculation & Asset Classification)
+### Workflow 7: EOD Batch Processing (DPD Recalculation & Asset Classification)
 Every night, the `sfb:update-dpd` console command executes:
 
 ```bash
@@ -521,7 +570,7 @@ php artisan sfb:update-dpd
    > **RBI Fair Lending Rule**: The penal charge is stored in `penal_charges_due` on the schedule record. It is **never** added to `principal_due` or compounding balances.
 6. **Upserts `recovery_cases`**: Synchronizes total overdue principal, overdue interest, penal charges, and total outstanding. If $\text{DPD} \ge 91$, updates `loans.status = 'npa'`.
 
-### Workflow 7: Delinquency Engagement & Calling Console (RBI Contact Hours)
+### Workflow 8: Delinquency Engagement & Calling Console (RBI Contact Hours)
 Field agents and call center recovery executives navigate `/recovery/console` to manage overdue loans.
 
 ```
@@ -535,7 +584,7 @@ Agent Selects Case ──► Inspects Overdue & DPD ──► Log Interaction �
   - **Server-side**: In [`RecoveryController::logContact()`](file:///c:/xampp/htdocs/loan_erp/app/Http/Controllers/RecoveryController.php#L54-L66), Carbon parses `contact_time`. If outside $08:00\text{--}19:00$, the request is rejected with validation errors.
 - **Dispositions Tracked**: `PTP` (Promise to Pay with target date and amount), `Broken_PTP`, `Dispute`, `Absconding`, `Crop_Failure`, `Medical_Emergency`, `RNR` (Ring No Response), and `Paid`.
 
-### Workflow 8: Statutory Legal Escalation & One-Time Settlement (OTS)
+### Workflow 9: Statutory Legal Escalation & One-Time Settlement (OTS)
 When accounts advance to SMA-2 and NPA, legal proceedings and compromise settlements are governed via `/recovery/legal`:
 
 #### Statutory Notices
@@ -596,6 +645,7 @@ Located at: [`app/Services/RepaymentWaterfallService.php`](file:///c:/xampp/htdo
 | **LmsController** | `cds()` | `/lms/cds` (`lms.cds`) | `GET` | Loads Kendra Collection Day Sheet filtered by center and meeting date, nesting groups, customers, and active schedules. |
 | **LoanController** | `show($id)` | `/lms/loans/{id}` (`lms.loans.show`) | `GET` | Renders Loan Ledger with borrower KYC, loan details, full schedule table, and past payment transactions. |
 | **LoanController** | `collect(..., $id)`| `/lms/loans/{id}/collect` (`lms.loans.collect`) | `POST`| Validates collection inputs and delegates to `RepaymentWaterfallService::apply()`. |
+| **SavingsController**| `index()`, `store()`, `collect()`| `/sms/savings` | `GET/POST`| Manages deposit originations (RD/FD) and handles savings collections into the unified ledger. |
 | **RecoveryController**| `console()` | `/recovery/console` (`recovery.console`) | `GET` | Renders delinquency bucket tabs (SMA-0, 1, 2, NPA), filterable case table, and pagination. |
 | **RecoveryController**| `logContact(...)`| `/recovery/log-contact` (`recovery.log-contact`)| `POST`| Validates contact time against 08:00–19:00 RBI window, creates `RecoveryCallLog`, updates `recovery_cases.last_contacted_at`. |
 | **LegalController** | `index()` | `/recovery/legal` (`recovery.legal`) | `GET` | Displays Statutory Notices registry, pending OTS proposals, and eligible NPA accounts. |

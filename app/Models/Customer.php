@@ -30,6 +30,16 @@ class Customer extends Model
         return $this->hasMany(Loan::class);
     }
 
+    public function savingsAccounts(): HasMany
+    {
+        return $this->hasMany(SavingsAccount::class);
+    }
+
+    public function activeSavingsAccount(): ?SavingsAccount
+    {
+        return $this->savingsAccounts()->where('status', 'active')->first();
+    }
+
     /**
      * Returns masked Aadhaar in the format XXXX-XXXX-1234
      */

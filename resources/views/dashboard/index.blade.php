@@ -44,13 +44,27 @@
         </div>
     </div>
 
+    <!-- Total Savings Mobilized -->
+    <div class="metric-card">
+        <div class="metric-card-content">
+            <div class="metric-info">
+                <p class="metric-title">Total Savings Mobilized</p>
+                <p class="metric-value text-emerald">{{ \App\Helpers\IndianCurrency::format($totalSavingsMobilized) }}</p>
+                <p class="metric-subtitle">{{ $totalSavingsAccounts }} active RD accounts</p>
+            </div>
+            <div class="metric-icon metric-icon-emerald">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            </div>
+        </div>
+    </div>
+
     <!-- Today's Due -->
     <div class="metric-card">
         <div class="metric-card-content">
             <div class="metric-info">
                 <p class="metric-title">Today's Collection Due</p>
                 <p class="metric-value text-saffron">{{ inr((float)$todayDue) }}</p>
-                <p class="metric-subtitle">{{ now()->format('d M Y') }}</p>
+                <p class="metric-subtitle" style="font-size:.72rem;">Loan: {{ inr((float)$todayLoanDue) }} | RD: {{ inr((float)$todaySavingsDue) }}</p>
             </div>
             <div class="metric-icon metric-icon-saffron">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
@@ -92,7 +106,7 @@
             <div class="metric-info">
                 <p class="metric-title">Collection Efficiency</p>
                 <p class="metric-value {{ $collectionEfficiency >= 95 ? 'text-emerald' : 'text-saffron' }}">{{ $collectionEfficiency }}%</p>
-                <p class="metric-subtitle">Last 30 days</p>
+                <p class="metric-subtitle">Last 30 days · {{ $missedRdCount }} missed RD deposits</p>
             </div>
             <div class="metric-icon metric-icon-emerald">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>

@@ -8,6 +8,7 @@ use App\Http\Controllers\LoanController;
 use App\Http\Controllers\LegalController;
 use App\Http\Controllers\LosController;
 use App\Http\Controllers\RecoveryController;
+use App\Http\Controllers\SavingsController;
 use Illuminate\Support\Facades\Route;
 
 // ── Authentication (Public) ───────────────────────────────────────────────────
@@ -24,8 +25,19 @@ Route::middleware('auth')->group(function () {
     // ── LMS: Loan Management System — All Roles ───────────────────────────
     Route::prefix('lms')->name('lms.')->group(function () {
         Route::get('/cds', [LmsController::class, 'cds'])->name('cds');
+        Route::post('/cds/bulk-settle', [LmsController::class, 'bulkSettle'])->name('cds.bulk-settle');
         Route::get('/loans/{id}', [LoanController::class, 'show'])->name('loans.show');
         Route::post('/loans/{id}/collect', [LoanController::class, 'collect'])->name('loans.collect');
+    });
+
+    // ── SMS: Savings Management System — All Roles ────────────────────────
+    Route::prefix('sms')->name('sms.')->group(function () {
+        Route::get('/savings', [SavingsController::class, 'index'])->name('savings.index');
+        Route::get('/savings/create', [SavingsController::class, 'create'])->name('savings.create');
+        Route::post('/savings', [SavingsController::class, 'store'])->name('savings.store');
+        Route::get('/savings/{id}', [SavingsController::class, 'show'])->name('savings.show');
+        Route::post('/savings/{id}/collect', [SavingsController::class, 'collect'])->name('savings.collect');
+        Route::get('/api/customer/{customerId}/savings', [SavingsController::class, 'apiAccountData'])->name('api.savings');
     });
 
     // ── LOS: Loan Origination — Agent Routes ──────────────────────────────

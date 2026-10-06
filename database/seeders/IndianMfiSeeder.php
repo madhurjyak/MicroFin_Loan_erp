@@ -13,33 +13,35 @@ use App\Models\OtsProposal;
 use App\Models\RecoveryCallLog;
 use App\Models\RecoveryCase;
 use App\Models\RepaymentSchedule;
+use App\Models\SavingsAccount;
+use App\Models\SavingsSchedule;
 use App\Models\StatutoryNotice;
 use App\Models\User;
 use App\Services\AmortizationService;
+use App\Services\SavingsOriginationService;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 /**
- * IndianMfiSeeder
+ * IndianMfiSeeder v3.0 — Full MVP (LMS + SMS + DRMS)
  *
  * Populates comprehensive, realistic Indian MFI demo data:
  * - 4 Staff users (admin, manager, 2 agents)
  * - 3 Centers (Assam geography)
  * - 6 JLG Groups, 25 female micro-entrepreneurs
  * - 18 Loans: 10 healthy, 4 SMA-0/1, 2 SMA-2, 2 NPA
- * - 5 Loan Applications (LOS demo data)
- * - Pre-seeded recovery cases, call logs, statutory notices
+ * - 25 RD Savings accounts (all members have an active RD)
+ * - Pre-seeded recovery cases, call logs, statutory notices, OTS proposal
+ * - 5 Loan Applications (LOS demo)
  */
 class IndianMfiSeeder extends Seeder
 {
-    private AmortizationService $amortization;
-
-    public function __construct(AmortizationService $amortization)
-    {
-        $this->amortization = $amortization;
-    }
+    public function __construct(
+        private AmortizationService      $amortization,
+        private SavingsOriginationService $savingsService
+    ) {}
 
     public function run(): void
     {
@@ -51,6 +53,8 @@ class IndianMfiSeeder extends Seeder
         DB::table('recovery_call_logs')->truncate();
         DB::table('recovery_cases')->truncate();
         DB::table('collection_transactions')->truncate();
+        DB::table('savings_schedules')->truncate();
+        DB::table('savings_accounts')->truncate();
         DB::table('repayment_schedules')->truncate();
         DB::table('loans')->truncate();
         DB::table('customers')->truncate();
@@ -59,7 +63,7 @@ class IndianMfiSeeder extends Seeder
         DB::table('users')->truncate();
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
-        $this->command->info('🏦 Seeding IndiaLend MFI Demo Data (v2.0 — RBAC + LOS)...');
+        $this->command->info('🏦 Seeding IndiaLend MFI Demo Data v3.0 (LMS + SMS + DRMS)...');
 
         // ────────────────────────────────────────────────────────────────────
         // 0. USERS (RBAC)
@@ -155,37 +159,37 @@ class IndianMfiSeeder extends Seeder
         // ────────────────────────────────────────────────────────────────────
         $customersRaw = [
             // Group 0 — Hajo Center, Lakshmi Group
-            ['Rekha Devi',         'G0', 'Female', '8474000001', 'ABCDE1234F', '1234', 'Hajo Bazar, Ward No. 3',     'Kamrup (M)',      'Assam', '781039', 180000, 3200],
-            ['Bina Kalita',        'G0', 'Female', '9435000002', 'BCDFE5678G', '5678', 'Village Pub Hajo',           'Kamrup',          'Assam', '781104', 144000, 2800],
-            ['Malati Sharma',      'G0', 'Female', '8822000003', 'CDEFG9012H', '9012', 'Bezpara, Hajo',              'Kamrup',          'Assam', '781104', 156000, 2500],
-            ['Parvati Nath',       'G0', 'Female', '7002000004', 'DEFGH3456I', '3456', 'Hajo Road, Rampur',          'Kamrup',          'Assam', '781039', 192000, 4000],
+            ['Rekha Devi',      'G0','Female','8474000001','ABCDE1234F','1234','Hajo Bazar, Ward No. 3',   'Kamrup (M)','Assam','781039',180000,3200],
+            ['Bina Kalita',     'G0','Female','9435000002','BCDFE5678G','5678','Village Pub Hajo',          'Kamrup',   'Assam','781104',144000,2800],
+            ['Malati Sharma',   'G0','Female','8822000003','CDEFG9012H','9012','Bezpara, Hajo',             'Kamrup',   'Assam','781104',156000,2500],
+            ['Parvati Nath',    'G0','Female','7002000004','DEFGH3456I','3456','Hajo Road, Rampur',         'Kamrup',   'Assam','781039',192000,4000],
             // Group 1 — Hajo Center, Durga Group
-            ['Purnima Borah',      'G1', 'Female', '9365000005', 'EFGHI7890J', '7890', 'Changsari, Hajo',            'Kamrup',          'Assam', '781101', 168000, 3000],
-            ['Sunita Das',         'G1', 'Female', '6002000006', 'FGHIJ2345K', '2345', 'Keotpara, North Guwahati',   'Kamrup',          'Assam', '781028', 120000, 2200],
-            ['Dipali Gogoi',       'G1', 'Female', '8403000007', 'GHIJK6789L', '6789', 'Amingaon, Kamrup',           'Kamrup',          'Assam', '781031', 204000, 3500],
+            ['Purnima Borah',   'G1','Female','9365000005','EFGHI7890J','7890','Changsari, Hajo',           'Kamrup',   'Assam','781101',168000,3000],
+            ['Sunita Das',      'G1','Female','6002000006','FGHIJ2345K','2345','Keotpara, North Guwahati',  'Kamrup',   'Assam','781028',120000,2200],
+            ['Dipali Gogoi',    'G1','Female','8403000007','GHIJK6789L','6789','Amingaon, Kamrup',          'Kamrup',   'Assam','781031',204000,3500],
             // Group 2 — Nalbari Center, Saraswati Group
-            ['Minakshi Das',       'G2', 'Female', '9706000008', 'HIJKL1234M', '1234', 'Nalbari Town, Ward 5',       'Nalbari',         'Assam', '781335', 144000, 2600],
-            ['Lakhimi Boro',       'G2', 'Female', '8822000009', 'IJKLM5678N', '5678', 'Tihu Road, Nalbari',         'Nalbari',         'Assam', '781371', 132000, 2400],
-            ['Gita Deka',          'G2', 'Female', '7002000010', 'JKLMN9012O', '9012', 'Ghograpar, Nalbari',         'Nalbari',         'Assam', '781360', 168000, 3100],
-            ['Priya Baruah',       'G2', 'Female', '9365000011', 'KLMNO3456P', '3456', 'Sarthebari, Barpeta',        'Barpeta',         'Assam', '781307', 156000, 2900],
+            ['Minakshi Das',    'G2','Female','9706000008','HIJKL1234M','1234','Nalbari Town, Ward 5',      'Nalbari',  'Assam','781335',144000,2600],
+            ['Lakhimi Boro',    'G2','Female','8822000009','IJKLM5678N','5678','Tihu Road, Nalbari',        'Nalbari',  'Assam','781371',132000,2400],
+            ['Gita Deka',       'G2','Female','7002000010','JKLMN9012O','9012','Ghograpar, Nalbari',        'Nalbari',  'Assam','781360',168000,3100],
+            ['Priya Baruah',    'G2','Female','9365000011','KLMNO3456P','3456','Sarthebari, Barpeta',       'Barpeta',  'Assam','781307',156000,2900],
             // Group 3 — Nalbari Center, Kali Group
-            ['Anita Sharma',       'G3', 'Female', '6002000012', 'LMNOP7890Q', '7890', 'Jalah, Nalbari',             'Nalbari',         'Assam', '781344', 150000, 2700],
-            ['Saraswati Devi',     'G3', 'Female', '9706000013', 'MNOPQ2345R', '2345', 'Pub Nalbari',                'Nalbari',         'Assam', '781335', 144000, 2800],
-            ['Kamala Das',         'G3', 'Female', '8474000014', 'NOPQR6789S', '6789', 'Rampur, Nalbari',            'Nalbari',         'Assam', '781335', 120000, 2200],
+            ['Anita Sharma',    'G3','Female','6002000012','LMNOP7890Q','7890','Jalah, Nalbari',            'Nalbari',  'Assam','781344',150000,2700],
+            ['Saraswati Devi',  'G3','Female','9706000013','MNOPQ2345R','2345','Pub Nalbari',               'Nalbari',  'Assam','781335',144000,2800],
+            ['Kamala Das',      'G3','Female','8474000014','NOPQR6789S','6789','Rampur, Nalbari',           'Nalbari',  'Assam','781335',120000,2200],
             // Group 4 — Rangia Center, Savitri Group
-            ['Mamoni Gogoi',       'G4', 'Female', '9435000015', 'OPQRS1234T', '1234', 'Rangia Town, Ward 2',        'Kamrup',          'Assam', '781354', 192000, 3800],
-            ['Rita Bora',          'G4', 'Female', '8403000016', 'PQRST5678U', '5678', 'Barama, Kamrup',             'Kamrup',          'Assam', '781346', 156000, 2500],
-            ['Shanti Nath',        'G4', 'Female', '7002000017', 'QRSTU9012V', '9012', 'Sualkuchi, Kamrup',          'Kamrup',          'Assam', '781102', 144000, 2400],
-            ['Hema Devi',          'G4', 'Female', '8822000018', 'RSTUV3456W', '3456', 'Barkhetry, Nalbari',         'Nalbari',         'Assam', '781335', 168000, 3000],
+            ['Mamoni Gogoi',    'G4','Female','9435000015','OPQRS1234T','1234','Rangia Town, Ward 2',       'Kamrup',   'Assam','781354',192000,3800],
+            ['Rita Bora',       'G4','Female','8403000016','PQRST5678U','5678','Barama, Kamrup',            'Kamrup',   'Assam','781346',156000,2500],
+            ['Shanti Nath',     'G4','Female','7002000017','QRSTU9012V','9012','Sualkuchi, Kamrup',         'Kamrup',   'Assam','781102',144000,2400],
+            ['Hema Devi',       'G4','Female','8822000018','RSTUV3456W','3456','Barkhetry, Nalbari',        'Nalbari',  'Assam','781335',168000,3000],
             // Group 5 — Rangia Center, Meera Group
-            ['Basanti Roy',        'G5', 'Female', '6002000019', 'STUVW7890X', '7890', 'Bezpara, Rangia',            'Kamrup',          'Assam', '781354', 180000, 3200],
-            ['Nandita Das',        'G5', 'Female', '9365000020', 'TUVWX2345Y', '2345', 'Chaygaon, Kamrup',           'Kamrup',          'Assam', '781124', 162000, 2900],
-            ['Padma Borah',        'G5', 'Female', '8474000021', 'UVWXY6789Z', '6789', 'Nagaon Road, Rangia',        'Kamrup',          'Assam', '781354', 150000, 2700],
-            ['Jyotsna Kalita',     'G5', 'Female', '9706000022', 'VWXYZ1234A', '1234', 'Palasbari, Kamrup',          'Kamrup (M)',      'Assam', '781026', 190000, 3300],
-            // Extra members spread across groups for realism
-            ['Usha Devi',          'G1', 'Female', '8822000023', 'WXYZ12345B', '2345', 'Kamarkuchi, Barpeta',        'Barpeta',         'Assam', '781301', 138000, 2600],
-            ['Renu Bora',          'G3', 'Female', '7002000024', 'XYZA23456C', '3456', 'Dakhinkhal, Kamrup',         'Kamrup',          'Assam', '781031', 120000, 2100],
-            ['Mina Gogoi',         'G2', 'Female', '9435000025', 'YZAB34567D', '4567', 'Kalaigaon, Darrang',         'Darrang',         'Assam', '784145', 156000, 2800],
+            ['Basanti Roy',     'G5','Female','6002000019','STUVW7890X','7890','Bezpara, Rangia',           'Kamrup',   'Assam','781354',180000,3200],
+            ['Nandita Das',     'G5','Female','9365000020','TUVWX2345Y','2345','Chaygaon, Kamrup',          'Kamrup',   'Assam','781124',162000,2900],
+            ['Padma Borah',     'G5','Female','8474000021','UVWXY6789Z','6789','Nagaon Road, Rangia',       'Kamrup',   'Assam','781354',150000,2700],
+            ['Jyotsna Kalita',  'G5','Female','9706000022','VWXYZ1234A','1234','Palasbari, Kamrup',         'Kamrup (M)','Assam','781026',190000,3300],
+            // Extra members
+            ['Usha Devi',       'G1','Female','8822000023','WXYZ12345B','2345','Kamarkuchi, Barpeta',       'Barpeta',  'Assam','781301',138000,2600],
+            ['Renu Bora',       'G3','Female','7002000024','XYZA23456C','3456','Dakhinkhal, Kamrup',        'Kamrup',   'Assam','781031',120000,2100],
+            ['Mina Gogoi',      'G2','Female','9435000025','YZAB34567D','4567','Kalaigaon, Darrang',        'Darrang',  'Assam','784145',156000,2800],
         ];
 
         $customers = [];
@@ -211,34 +215,151 @@ class IndianMfiSeeder extends Seeder
             ]);
         }
 
-        // ────────────────────────────────────────────────────────────────────
-        // 4. LOANS + REPAYMENT SCHEDULES
-        // ────────────────────────────────────────────────────────────────────
+        $this->command->info('  → 25 Customers created');
 
-        $today      = Carbon::today();
-        $loansSpec  = [
-            // [customer_idx, principal, rate, tenure, freq, disburse_months_ago, daysOverdue, status_preset]
-            // ── Healthy accounts ──
+        // ────────────────────────────────────────────────────────────────────
+        // 4. SAVINGS ACCOUNTS (All 25 members — weekly RD @ ₹100 or ₹200)
+        // ────────────────────────────────────────────────────────────────────
+        $this->command->info('  → Creating 25 RD Savings Accounts...');
+        $today    = Carbon::today();
+        $savingsAccounts = [];
+
+        // RD specs per member index: [deposit_amount, interest_rate, tenure_months, months_running, pct_paid]
+        $rdSpecs = [
+            [100, 5.50, 12, 10, 85],  // 0: Rekha Devi     — almost complete
+            [100, 5.50, 12,  8, 70],  // 1: Bina Kalita
+            [200, 5.75, 24,  6, 25],  // 2: Malati Sharma
+            [100, 5.50, 12, 11, 90],  // 3: Parvati Nath   — nearly done
+            [150, 5.50, 18,  5, 28],  // 4: Purnima Borah
+            [100, 5.50, 12,  9, 75],  // 5: Sunita Das
+            [200, 5.75, 24, 12, 50],  // 6: Dipali Gogoi
+            [100, 5.50, 12,  7, 58],  // 7: Minakshi Das
+            [100, 5.50, 12,  3, 25],  // 8: Lakhimi Boro
+            [200, 5.75, 18, 10, 55],  // 9: Gita Deka
+            [100, 5.50, 12, 11, 80],  // 10: Priya Baruah  — SMA account holder
+            [100, 5.50, 12,  9, 65],  // 11: Anita Sharma  — SMA account holder
+            [150, 5.50, 18, 14, 60],  // 12: Saraswati Devi
+            [100, 5.50, 24, 16, 55],  // 13: Kamala Das
+            [200, 5.75, 18, 18, 70],  // 14: Mamoni Gogoi  — SMA-2
+            [100, 5.50, 24, 20, 65],  // 15: Rita Bora     — SMA-2
+            [100, 5.50, 18, 22, 75],  // 16: Shanti Nath   — NPA
+            [200, 5.75, 24, 25, 75],  // 17: Hema Devi     — NPA
+            [100, 5.50, 12,  8, 65],  // 18: Basanti Roy
+            [150, 5.50, 18,  9, 50],  // 19: Nandita Das
+            [100, 5.50, 12,  7, 58],  // 20: Padma Borah
+            [200, 5.75, 24, 10, 42],  // 21: Jyotsna Kalita
+            [100, 5.50, 12,  6, 50],  // 22: Usha Devi
+            [100, 5.50, 12,  5, 42],  // 23: Renu Bora
+            [150, 5.50, 18,  7, 39],  // 24: Mina Gogoi
+        ];
+
+        foreach ($customers as $idx => $customer) {
+            [$depAmt, $rate, $tenureMonths, $monthsRunning, $pctPaid] = $rdSpecs[$idx];
+
+            $openingDate = $today->copy()->subMonths($monthsRunning)->startOfMonth();
+            $maturityDate = $openingDate->copy()->addMonths($tenureMonths);
+
+            // Calculate number of weekly installments
+            $totalInstallments = (int) round($tenureMonths * 52 / 12);
+            $paidInstallments  = (int) round($totalInstallments * $pctPaid / 100);
+
+            $maturityAmount = $this->savingsService->calculateMaturityAmount(
+                $depAmt, $rate, $tenureMonths, 'weekly'
+            );
+
+            // Generate account number manually for seeder (bypass originationService counter)
+            $accountNo = 'RD' . $openingDate->format('Y') . str_pad($idx + 1, 6, '0', STR_PAD_LEFT);
+
+            $sa = SavingsAccount::create([
+                'customer_id'               => $customer->id,
+                'account_no'                => $accountNo,
+                'account_type'              => 'rd',
+                'deposit_amount'            => $depAmt,
+                'interest_rate'             => $rate,
+                'tenure'                    => $tenureMonths,
+                'frequency'                 => 'weekly',
+                'opening_date'              => $openingDate->toDateString(),
+                'maturity_date'             => $maturityDate->toDateString(),
+                'status'                    => 'active',
+                'total_principal_collected' => $paidInstallments * $depAmt,
+                'total_interest_accrued'    => 0,
+                'maturity_amount'           => $maturityAmount,
+            ]);
+
+            // Generate schedule
+            for ($i = 1; $i <= $totalInstallments; $i++) {
+                $dueDate = $openingDate->copy()->addWeeks($i);
+                $isPaid  = $i <= $paidInstallments;
+                $isMissed = !$isPaid && $dueDate->lt($today) && in_array($idx, [10, 11, 14, 15, 16, 17]) && $i > $paidInstallments && $i <= $paidInstallments + 3;
+
+                SavingsSchedule::create([
+                    'savings_account_id' => $sa->id,
+                    'installment_no'     => $i,
+                    'due_date'           => $dueDate->toDateString(),
+                    'amount_expected'    => $depAmt,
+                    'amount_collected'   => $isPaid ? $depAmt : 0,
+                    'interest_accrued'   => $isPaid ? round($depAmt * ($rate / 100 / 52), 2) : 0,
+                    'status'             => $isPaid ? 'paid' : ($isMissed ? 'missed' : 'pending'),
+                    'collection_date'    => $isPaid ? $dueDate->toDateString() : null,
+                ]);
+
+                // Record collection transactions for paid installments
+                if ($isPaid) {
+                    $modeOptions = ['cash', 'upi_qr', 'nach'];
+                    CollectionTransaction::create([
+                        'loan_id'             => null,
+                        'schedule_id'         => null,
+                        'savings_account_id'  => $sa->id,
+                        'savings_schedule_id' => null, // simplified for seeder
+                        'transaction_type'    => 'savings_deposit',
+                        'receipt_no'          => 'RDRCP' . strtoupper(substr(md5($sa->id . '_' . $i), 0, 8)),
+                        'amount_collected'    => $depAmt,
+                        'collection_date'     => $dueDate->toDateString(),
+                        'collected_by'        => $customer->group->center->field_officer ?? 'Field Officer',
+                        'payment_mode'        => $modeOptions[array_rand($modeOptions)],
+                        'remarks'             => "RD Deposit #{$i}: ₹{$depAmt}",
+                    ]);
+                }
+            }
+
+            $savingsAccounts[] = $sa;
+        }
+
+        // Compute interest for all savings accounts (simple pass)
+        foreach ($savingsAccounts as $sa) {
+            $sa->refresh();
+            $collected = (float) $sa->total_principal_collected;
+            $periodicRate = (float) $sa->interest_rate / 100 / 52;
+            // Simple approximation of accrued interest
+            $paidCount = SavingsSchedule::where('savings_account_id', $sa->id)->where('status','paid')->count();
+            $n = SavingsSchedule::where('savings_account_id', $sa->id)->count();
+            $interestAccrued = (float) $sa->deposit_amount * $periodicRate * ($paidCount * ($n - $paidCount / 2));
+            $sa->update(['total_interest_accrued' => round(max(0, $interestAccrued), 2)]);
+        }
+
+        $this->command->info('  → 25 RD accounts created with schedules and paid history');
+
+        // ────────────────────────────────────────────────────────────────────
+        // 5. LOANS + REPAYMENT SCHEDULES (18 loans)
+        // ────────────────────────────────────────────────────────────────────
+        $loansSpec = [
+            // [customer_idx, principal, rate, tenure, freq, disburse_months_ago, daysOverdue, preset]
             [0,  50000, 22.00, 12, 'monthly', 10, 0,   'healthy'],
-            [1,  40000, 21.50, 24, 'monthly', 8,  0,   'healthy'],
-            [2,  30000, 22.00, 12, 'monthly', 6,  0,   'healthy'],
+            [1,  40000, 21.50, 24, 'monthly',  8, 0,   'healthy'],
+            [2,  30000, 22.00, 12, 'monthly',  6, 0,   'healthy'],
             [3,  60000, 23.00, 18, 'monthly', 14, 0,   'healthy'],
-            [4,  45000, 22.00, 12, 'monthly', 5,  0,   'healthy'],
-            [5,  35000, 21.00, 12, 'monthly', 9,  0,   'healthy'],
+            [4,  45000, 22.00, 12, 'monthly',  5, 0,   'healthy'],
+            [5,  35000, 21.00, 12, 'monthly',  9, 0,   'healthy'],
             [6,  70000, 24.00, 24, 'monthly', 12, 0,   'healthy'],
-            [7,  55000, 22.50, 18, 'monthly', 7,  0,   'healthy'],
-            [8,  40000, 22.00, 12, 'monthly', 3,  0,   'healthy'],
+            [7,  55000, 22.50, 18, 'monthly',  7, 0,   'healthy'],
+            [8,  40000, 22.00, 12, 'monthly',  3, 0,   'healthy'],
             [9,  80000, 23.00, 24, 'monthly', 11, 0,   'healthy'],
-            // ── SMA-0 (1–30 DPD) ──
             [10, 50000, 22.00, 12, 'monthly', 11, 20,  'sma0'],
-            [11, 40000, 21.50, 12, 'monthly', 9,  10,  'sma0'],
-            // ── SMA-1 (31–60 DPD) ──
+            [11, 40000, 21.50, 12, 'monthly',  9, 10,  'sma0'],
             [12, 45000, 22.00, 18, 'monthly', 14, 45,  'sma1'],
             [13, 60000, 23.00, 24, 'monthly', 16, 50,  'sma1'],
-            // ── SMA-2 (61–90 DPD) ──
             [14, 55000, 24.00, 18, 'monthly', 18, 75,  'sma2'],
             [15, 70000, 22.50, 24, 'monthly', 20, 80,  'sma2'],
-            // ── NPA (91+ DPD) ──
             [16, 60000, 23.00, 18, 'monthly', 22, 110, 'npa'],
             [17, 80000, 24.00, 24, 'monthly', 25, 130, 'npa'],
         ];
@@ -265,23 +386,22 @@ class IndianMfiSeeder extends Seeder
                 'disbursement_mode'   => 'cash',
                 'processing_fee'      => round($principal * 0.01, 2),
                 'processing_fee_gst'  => round($principal * 0.01 * 0.18, 2),
-                'purpose'             => ['Dairy Business', 'Poultry Farming', 'Vegetable Vending', 'Tailoring Unit', 'Grocery Shop', 'Pottery', 'Handloom Weaving'][$i % 7],
+                'purpose'             => ['Dairy Business','Poultry Farming','Vegetable Vending','Tailoring Unit','Grocery Shop','Pottery','Handloom Weaving'][$i % 7],
             ]);
 
-            // Generate amortization schedule (bypass FOIR validation for seeder)
+            // Generate amortization schedule
             $scheduleRows = $this->amortization->generate($loan, false);
-
             foreach ($scheduleRows as $row) {
                 RepaymentSchedule::create(array_merge(['loan_id' => $loan->id], $row));
             }
 
-            // ── Mark paid installments for healthy accounts ──
+            // ── Mark paid installments ──────────────────────────────────────
             if ($preset === 'healthy') {
                 $paidCount = max(0, $monthsAgo - 1);
                 $schedules = RepaymentSchedule::where('loan_id', $loan->id)->orderBy('installment_no')->get();
 
                 foreach ($schedules->take($paidCount) as $s) {
-                    $collectionDate = $disbDate->copy()->addMonths($s->installment_no)->startOfMonth()->addDays(2);
+                    $collDate = $disbDate->copy()->addMonths($s->installment_no)->startOfMonth()->addDays(2);
                     $totalDue = (float)$s->principal_due + (float)$s->interest_due;
                     $s->update([
                         'principal_paid' => $s->principal_due,
@@ -290,18 +410,19 @@ class IndianMfiSeeder extends Seeder
                         'status'         => 'paid',
                     ]);
                     CollectionTransaction::create([
-                        'loan_id'          => $loan->id,
-                        'schedule_id'      => $s->id,
-                        'receipt_no'       => 'RCP' . strtoupper(substr(md5($loan->id . $s->id), 0, 8)),
-                        'amount_collected' => $totalDue,
-                        'collection_date'  => $collectionDate->toDateString(),
-                        'collected_by'     => $loan->customer->group->center->field_officer ?? 'Field Officer',
-                        'payment_mode'     => ['cash', 'upi_qr', 'nach'][array_rand(['cash', 'upi_qr', 'nach'])],
+                        'loan_id'           => $loan->id,
+                        'schedule_id'       => $s->id,
+                        'transaction_type'  => 'loan_repayment',
+                        'receipt_no'        => 'RCP' . strtoupper(substr(md5($loan->id . $s->id), 0, 8)),
+                        'amount_collected'  => $totalDue,
+                        'collection_date'   => $collDate->toDateString(),
+                        'collected_by'      => $loan->customer->group->center->field_officer ?? 'Field Officer',
+                        'payment_mode'      => ['cash','upi_qr','nach'][array_rand(['cash','upi_qr','nach'])],
                     ]);
                 }
             }
 
-            // ── Mark overdue installments for delinquent accounts ──
+            // ── Mark overdue/penal for delinquent ──────────────────────────
             if (in_array($preset, ['sma0', 'sma1', 'sma2', 'npa'])) {
                 $overdueInstallments = (int) ceil($daysOverdue / 30);
                 $schedules = RepaymentSchedule::where('loan_id', $loan->id)->orderBy('installment_no')->get();
@@ -319,12 +440,11 @@ class IndianMfiSeeder extends Seeder
 
                 foreach ($schedules->slice($paidUpTo) as $s) {
                     $penal = $this->amortization->penalChargeForBounce();
-                    $totalWithPenal = (float)$s->total_due + $penal['total'];
                     $s->update([
                         'status'            => 'overdue',
                         'penal_charges_due' => $penal['penal'],
                         'penal_gst_due'     => $penal['gst'],
-                        'total_due'         => $totalWithPenal,
+                        'total_due'         => (float)$s->total_due + $penal['total'],
                     ]);
                 }
             }
@@ -332,11 +452,12 @@ class IndianMfiSeeder extends Seeder
             $loans[] = $loan;
         }
 
+        $this->command->info('  → 18 Loans: 10 healthy | 4 SMA-0/1 | 2 SMA-2 | 2 NPA');
+
         // ────────────────────────────────────────────────────────────────────
-        // 5. RECOVERY CASES (with assigned_officer_id FK)
+        // 6. RECOVERY CASES
         // ────────────────────────────────────────────────────────────────────
         $recoverySpecs = [
-            // [loan_idx, dpd, classification, agent_user]
             [10, 20,  'SMA-0',          $agent1],
             [11, 10,  'SMA-0',          $agent1],
             [12, 45,  'SMA-1',          $agent2],
@@ -374,26 +495,26 @@ class IndianMfiSeeder extends Seeder
                 'total_outstanding'      => round($overduePrincipal + $overdueInterest + $totalPenal, 2),
                 'assigned_officer'       => $agentUser->name,
                 'assigned_officer_id'    => $agentUser->id,
-                'last_contacted_at'      => $today->copy()->subDays(rand(3,10)),
-                'remarks'               => 'Auto-created by IndianMfiSeeder',
+                'last_contacted_at'      => $today->copy()->subDays(rand(3, 10)),
+                'remarks'                => 'Auto-created by IndianMfiSeeder v3.0',
             ]);
         }
 
         // ────────────────────────────────────────────────────────────────────
-        // 6. RECOVERY CALL LOGS (SMA-2 and NPA accounts)
+        // 7. RECOVERY CALL LOGS
         // ────────────────────────────────────────────────────────────────────
         $callLogsSpec = [
-            [14, 'telecalling', '-5 days', '10:30', 'PTP',           '-3 days', 8000,  'Borrower promised payment on {ptp_date}'],
-            [14, 'field_visit', '-3 days', '15:00', 'Broken_PTP',    null,      null,  'Visited residence. Borrower not home, neighbour says she is unwell.'],
-            [14, 'telecalling', '-1 days', '09:45', 'Crop_Failure',  null,      null,  'Borrower states crop damaged due to recent floods.'],
-            [15, 'telecalling', '-7 days', '11:00', 'PTP',           '-5 days', 12000, 'Promised payment via NACH next cycle.'],
-            [15, 'field_visit', '-4 days', '14:30', 'Dispute',       null,      null,  'Borrower disputes interest calculation. Referred to branch.'],
-            [16, 'telecalling', '-15 days','10:00', 'Absconding',    null,      null,  'Phone switched off. Neighbour says family moved.'],
-            [16, 'field_visit', '-10 days','11:30', 'Absconding',    null,      null,  'Residence locked. No information from neighbours.'],
-            [16, 'telecalling', '-5 days', '14:00', 'RNR',           null,      null,  'Ringing, no response.'],
-            [17, 'telecalling', '-20 days','09:00', 'Medical_Emergency', null,  null,  'Borrower hospitalised. Husband informed about dues.'],
-            [17, 'field_visit', '-12 days','16:00', 'PTP',           '-9 days', 15000, 'Met borrower at home. She is recovering. PTP given.'],
-            [17, 'telecalling', '-8 days', '10:15', 'Broken_PTP',    null,      null,  'PTP broken. Borrower says she needs more time.'],
+            [14, 'telecalling', '-5 days', '10:30', 'PTP',              '-3 days', 8000,  'Borrower promised payment on {ptp_date}'],
+            [14, 'field_visit', '-3 days', '15:00', 'Broken_PTP',       null,      null,  'Visited residence. Borrower not home, neighbour says she is unwell.'],
+            [14, 'telecalling', '-1 days', '09:45', 'Crop_Failure',     null,      null,  'Borrower states crop damaged due to recent floods in Kamrup.'],
+            [15, 'telecalling', '-7 days', '11:00', 'PTP',              '-5 days', 12000, 'Promised payment via NACH next cycle.'],
+            [15, 'field_visit', '-4 days', '14:30', 'Dispute',          null,      null,  'Borrower disputes interest calculation. Referred to branch.'],
+            [16, 'telecalling', '-15 days','10:00', 'Absconding',       null,      null,  'Phone switched off. Neighbour says family moved temporarily.'],
+            [16, 'field_visit', '-10 days','11:30', 'Absconding',       null,      null,  'Residence locked. No information from neighbours.'],
+            [16, 'telecalling', '-5 days', '14:00', 'RNR',              null,      null,  'Ringing, no response.'],
+            [17, 'telecalling', '-20 days','09:00', 'Medical_Emergency',null,      null,  'Borrower hospitalised. Husband informed about dues.'],
+            [17, 'field_visit', '-12 days','16:00', 'PTP',              '-9 days', 15000, 'Met borrower at home. Recovering. PTP given.'],
+            [17, 'telecalling', '-8 days', '10:15', 'Broken_PTP',       null,      null,  'PTP broken. Borrower says she needs more time.'],
         ];
 
         foreach ($callLogsSpec as $cl) {
@@ -403,7 +524,6 @@ class IndianMfiSeeder extends Seeder
             $contactDate = $today->copy()->modify($daysAgo);
             [$hour, $min] = explode(':', $timeStr);
             $contactTime = $contactDate->copy()->setTime((int)$hour, (int)$min);
-
             $ptpDate = $ptpDaysAgo ? $today->copy()->modify($ptpDaysAgo)->toDateString() : null;
 
             RecoveryCallLog::create([
@@ -419,54 +539,33 @@ class IndianMfiSeeder extends Seeder
         }
 
         // ────────────────────────────────────────────────────────────────────
-        // 7. STATUTORY NOTICES — NPA accounts (Loans 16 & 17)
+        // 8. STATUTORY NOTICES (NPA accounts — Loans 16 & 17)
         // ────────────────────────────────────────────────────────────────────
-        StatutoryNotice::create([
-            'loan_id'               => $loans[16]->id,
-            'notice_type'           => 'Sec_25_PSSA_AutoDebit_Bounce',
-            'notice_ref_no'         => 'ILP/SEC25/' . $today->format('Y') . '/0001',
-            'dispatch_date'         => $today->copy()->subDays(30),
-            'tracking_speedpost_no' => 'EW' . rand(100000000, 999999999) . 'IN',
-            'status'                => 'dispatched',
-            'remarks'               => 'First notice. Awaiting service confirmation.',
-        ]);
+        $noticeData = [
+            [$loans[16]->id, 'Sec_25_PSSA_AutoDebit_Bounce', 'ILP/SEC25/'  . $today->format('Y') . '/0001', -30, 'dispatched', 'First notice. Awaiting service confirmation.'],
+            [$loans[16]->id, 'Loan_Recall_Notice',            'ILP/RECALL/' . $today->format('Y') . '/0001', -10, 'generated',  'Recall notice generated pending dispatch.'],
+            [$loans[17]->id, 'Sec_25_PSSA_AutoDebit_Bounce', 'ILP/SEC25/'  . $today->format('Y') . '/0002', -25, 'served',     'Served via Speed Post. Proof of delivery received.'],
+            [$loans[17]->id, 'Sec_138_NI_Act',                'ILP/SEC138/' . $today->format('Y') . '/0001',  -5, 'generated',  'Advocate notice to be issued pending approval.'],
+        ];
 
-        StatutoryNotice::create([
-            'loan_id'               => $loans[16]->id,
-            'notice_type'           => 'Loan_Recall_Notice',
-            'notice_ref_no'         => 'ILP/RECALL/' . $today->format('Y') . '/0001',
-            'dispatch_date'         => $today->copy()->subDays(10),
-            'tracking_speedpost_no' => 'EW' . rand(100000000, 999999999) . 'IN',
-            'status'                => 'generated',
-            'remarks'               => 'Recall notice generated pending dispatch.',
-        ]);
-
-        StatutoryNotice::create([
-            'loan_id'               => $loans[17]->id,
-            'notice_type'           => 'Sec_25_PSSA_AutoDebit_Bounce',
-            'notice_ref_no'         => 'ILP/SEC25/' . $today->format('Y') . '/0002',
-            'dispatch_date'         => $today->copy()->subDays(25),
-            'tracking_speedpost_no' => 'EW' . rand(100000000, 999999999) . 'IN',
-            'status'                => 'served',
-            'remarks'               => 'Served via Speed Post. Proof of delivery received.',
-        ]);
-
-        StatutoryNotice::create([
-            'loan_id'               => $loans[17]->id,
-            'notice_type'           => 'Sec_138_NI_Act',
-            'notice_ref_no'         => 'ILP/SEC138/' . $today->format('Y') . '/0001',
-            'dispatch_date'         => $today->copy()->subDays(5),
-            'tracking_speedpost_no' => null,
-            'status'                => 'generated',
-            'remarks'               => 'Advocate notice to be issued pending approval.',
-        ]);
+        foreach ($noticeData as [$loanId, $type, $ref, $daysAgo, $status, $remarks]) {
+            StatutoryNotice::create([
+                'loan_id'               => $loanId,
+                'notice_type'           => $type,
+                'notice_ref_no'         => $ref,
+                'dispatch_date'         => $today->copy()->addDays($daysAgo),
+                'tracking_speedpost_no' => $status !== 'generated' ? 'EW' . rand(100000000, 999999999) . 'IN' : null,
+                'status'                => $status,
+                'remarks'               => $remarks,
+            ]);
+        }
 
         // ────────────────────────────────────────────────────────────────────
-        // 8. OTS PROPOSAL — NPA Loan 17
+        // 9. OTS PROPOSAL (NPA Loan 17)
         // ────────────────────────────────────────────────────────────────────
-        $npaLoan = $loans[17];
+        $npaLoan    = $loans[17];
         $outstanding = $recoveryCases[17]->total_outstanding ?? 50000;
-        $proposed    = round($outstanding * 0.70, 2); // 30% haircut
+        $proposed    = round($outstanding * 0.70, 2);
         $haircut     = round((($outstanding - $proposed) / $outstanding) * 100, 2);
 
         OtsProposal::create([
@@ -479,18 +578,17 @@ class IndianMfiSeeder extends Seeder
             'haircut_pct'        => $haircut,
             'approval_authority' => 'Regional_Credit_Committee',
             'status'             => 'pending',
-            'remarks'            => 'Borrower under medical treatment. RCC meeting scheduled.',
+            'remarks'            => 'Borrower under medical treatment. RCC meeting scheduled for next week.',
         ]);
 
         // ────────────────────────────────────────────────────────────────────
-        // 9. LOAN APPLICATIONS (LOS demo data)
+        // 10. LOAN APPLICATIONS (LOS demo)
         // ────────────────────────────────────────────────────────────────────
         $year = $today->format('Y');
 
-        // App 1: Submitted — ready for manager review (Agent 1)
         $app1 = LoanApplication::create([
             'application_no'      => "APP-{$year}-001",
-            'customer_id'         => $customers[18]->id, // Basanti Roy
+            'customer_id'         => $customers[18]->id,
             'agent_id'            => $agent1->id,
             'applied_amount'      => 45000,
             'annual_interest_rate'=> 22.00,
@@ -500,10 +598,9 @@ class IndianMfiSeeder extends Seeder
             'stage'               => 'submitted',
         ]);
 
-        // App 2: Submitted — ready for review (Agent 2)
         $app2 = LoanApplication::create([
             'application_no'      => "APP-{$year}-002",
-            'customer_id'         => $customers[19]->id, // Nandita Das
+            'customer_id'         => $customers[19]->id,
             'agent_id'            => $agent2->id,
             'applied_amount'      => 35000,
             'annual_interest_rate'=> 21.50,
@@ -513,10 +610,9 @@ class IndianMfiSeeder extends Seeder
             'stage'               => 'submitted',
         ]);
 
-        // App 3: Rejected (Agent 1)
         $app3 = LoanApplication::create([
             'application_no'      => "APP-{$year}-003",
-            'customer_id'         => $customers[22]->id, // Usha Devi
+            'customer_id'         => $customers[22]->id,
             'agent_id'            => $agent1->id,
             'applied_amount'      => 80000,
             'annual_interest_rate'=> 23.00,
@@ -525,13 +621,12 @@ class IndianMfiSeeder extends Seeder
             'purpose'             => 'Grocery Shop',
             'stage'               => 'rejected',
             'reviewed_by'         => $manager->id,
-            'rejection_reason'    => 'FOIR exceeds 50% RBI cap. Customer already has high monthly obligations.',
+            'rejection_reason'    => 'FOIR exceeds 50% RBI cap. Customer already has high monthly obligations (₹2,600). Applied amount creates obligation > 50%.',
         ]);
 
-        // App 4: Approved — linked to Loan #0 (Rekha Devi)
         $app4 = LoanApplication::create([
             'application_no'      => "APP-{$year}-004",
-            'customer_id'         => $customers[0]->id, // Rekha Devi
+            'customer_id'         => $customers[0]->id,
             'agent_id'            => $agent1->id,
             'applied_amount'      => 50000,
             'annual_interest_rate'=> 22.00,
@@ -543,14 +638,11 @@ class IndianMfiSeeder extends Seeder
             'review_notes'        => 'All documents verified. FOIR within limits. Approved for disbursement.',
             'approved_at'         => $today->copy()->subMonths(10),
         ]);
-
-        // Link loan #0 to app4
         $loans[0]->update(['loan_application_id' => $app4->id]);
 
-        // App 5: Approved — linked to Loan #1 (Bina Kalita)
         $app5 = LoanApplication::create([
             'application_no'      => "APP-{$year}-005",
-            'customer_id'         => $customers[1]->id, // Bina Kalita
+            'customer_id'         => $customers[1]->id,
             'agent_id'            => $agent2->id,
             'applied_amount'      => 40000,
             'annual_interest_rate'=> 21.50,
@@ -562,23 +654,20 @@ class IndianMfiSeeder extends Seeder
             'review_notes'        => 'Customer has good repayment history. Approved.',
             'approved_at'         => $today->copy()->subMonths(8),
         ]);
-
         $loans[1]->update(['loan_application_id' => $app5->id]);
 
-        // ── Documents for each application ──
+        // Documents
         $allApps = [$app1, $app2, $app3, $app4, $app5];
         $docTypes = ['aadhaar_card', 'pan_card', 'bank_passbook', 'income_declaration'];
 
-        foreach ($allApps as $appIdx => $app) {
+        foreach ($allApps as $app) {
             foreach ($docTypes as $docType) {
                 $docNumber = match($docType) {
                     'aadhaar_card' => 'XXXX-XXXX-' . ($app->customer->aadhaar_last4 ?? '1234'),
                     'pan_card'     => $app->customer->pan_number ?? 'ABCDE1234F',
                     default        => null,
                 };
-
                 $isVerified = in_array($app->stage, ['approved', 'rejected']);
-
                 LoanDocument::create([
                     'loan_application_id' => $app->id,
                     'document_type'       => $docType,
@@ -590,16 +679,19 @@ class IndianMfiSeeder extends Seeder
             }
         }
 
-        $this->command->info('✅ Seeded: 4 Users, 3 Centers, 6 Groups, 25 Customers, 18 Loans');
-        $this->command->info('   → 10 healthy | 4 SMA-0/1 | 2 SMA-2 | 2 NPA');
+        $this->command->info('');
+        $this->command->info('✅ Seeded: 4 Users, 3 Centers, 6 Groups, 25 Customers');
+        $this->command->info('   → 25 RD Savings Accounts with schedules (SMS module)');
+        $this->command->info('   → 18 Loans: 10 healthy | 4 SMA-0/1 | 2 SMA-2 | 2 NPA');
         $this->command->info('   → 4 Statutory Notices | 1 OTS Proposal | 11 Call Logs');
-        $this->command->info('   → 5 Loan Applications (2 submitted, 1 rejected, 2 approved)');
-        $this->command->info('   → 20 KYC Documents attached');
+        $this->command->info('   → 5 Loan Applications (2 submitted, 1 rejected, 2 approved) + 20 KYC docs');
         $this->command->info('');
         $this->command->info('🔑 Login credentials (password: password):');
         $this->command->info('   admin@sfb.in   — Admin (Full Access)');
         $this->command->info('   manager@sfb.in — Manager (Underwriting + Recovery)');
         $this->command->info('   agent1@sfb.in  — Agent (Origination + Field)');
         $this->command->info('   agent2@sfb.in  — Agent (Origination + Field)');
+        $this->command->info('');
+        $this->command->info('🚀 Verify: php artisan sfb:update-dpd --dry-run');
     }
 }

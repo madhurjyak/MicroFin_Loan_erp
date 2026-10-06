@@ -123,8 +123,19 @@ class LoanOriginationService
 
             // 2. Generate loan account number
             $year   = Carbon::now()->format('Y');
-            $loanCount = Loan::where('loan_account_no', 'LIKE', "SFB{$year}%")->count();
-            $loanAccountNo = 'SFB' . $year . str_pad($loanCount + 1, 5, '0', STR_PAD_LEFT);
+            
+            $latestLoan = Loan::where('loan_account_no', 'LIKE', "SFB{$year}%")
+                ->orderBy('id', 'desc')
+                ->lockForUpdate()
+                ->first();
+                
+            $nextNumber = 1;
+            if ($latestLoan) {
+                $lastNumber = (int) substr($latestLoan->loan_account_no, 7);
+                $nextNumber = $lastNumber + 1;
+            }
+            
+            $loanAccountNo = 'SFB' . $year . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
 
             // 3. Create active loan record
             $disbursementDate = Carbon::today();

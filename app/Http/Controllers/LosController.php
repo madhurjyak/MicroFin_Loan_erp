@@ -27,8 +27,11 @@ class LosController extends Controller
         $customers = Customer::with('group.center')
             ->orderBy('full_name')
             ->get();
+            
+        $centers = Center::orderBy('center_name')->get();
+        $groups = Group::orderBy('group_name')->get();
 
-        return view('los.apply', compact('customers'));
+        return view('los.apply', compact('customers', 'centers', 'groups'));
     }
 
     /**

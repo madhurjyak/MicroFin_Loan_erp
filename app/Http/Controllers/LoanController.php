@@ -3,13 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Loan;
-use App\Services\RepaymentWaterfallService;
+use App\Services\CollectionLedgerService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class LoanController extends Controller
 {
-    public function __construct(private RepaymentWaterfallService $waterfall) {}
+    public function __construct(private CollectionLedgerService $ledger) {}
 
     /**
      * Loan Account Ledger — full schedule, KYC, and collection history
@@ -18,6 +18,7 @@ class LoanController extends Controller
     {
         $loan = Loan::with([
             'customer.group.center',
+            'customer.savingsAccounts',
             'repaymentSchedules',
             'collectionTransactions.peerPayer',
             'recoveryCase',
@@ -52,7 +53,7 @@ class LoanController extends Controller
             'peer_payer_customer_id' => 'nullable|exists:customers,id',
         ]);
 
-        $summary = $this->waterfall->apply(
+        $summary = $this->ledger->applyLoanPayment(
             loan: $loan,
             amountCollected: (float) $validated['amount_collected'],
             paymentMode: $validated['payment_mode'],
