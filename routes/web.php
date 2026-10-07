@@ -33,9 +33,12 @@ Route::middleware('auth')->group(function () {
     // ── SMS: Savings Management System — All Roles ────────────────────────
     Route::prefix('sms')->name('sms.')->group(function () {
         Route::get('/savings', [SavingsController::class, 'index'])->name('savings.index');
+        Route::get('/savings/data', [SavingsController::class, 'data'])->name('savings.data');
         Route::get('/savings/create', [SavingsController::class, 'create'])->name('savings.create');
         Route::post('/savings', [SavingsController::class, 'store'])->name('savings.store');
         Route::get('/savings/{id}', [SavingsController::class, 'show'])->name('savings.show');
+        Route::get('/savings/{id}/schedule/data', [SavingsController::class, 'scheduleData'])->name('savings.schedule.data');
+        Route::get('/savings/{id}/transactions/data', [SavingsController::class, 'transactionsData'])->name('savings.transactions.data');
         Route::post('/savings/{id}/collect', [SavingsController::class, 'collect'])->name('savings.collect');
         Route::get('/api/customer/{customerId}/savings', [SavingsController::class, 'apiAccountData'])->name('api.savings');
     });

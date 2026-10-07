@@ -124,34 +124,15 @@
             </tr>
         </thead>
         <tbody>
-        @foreach($account->schedules as $s)
-            <tr @class(['overdue-row' => $s->status === 'missed'])>
-                <td>{{ $s->installment_no }}</td>
-                <td>{{ \Carbon\Carbon::parse($s->due_date)->format('d-M-Y') }}</td>
-                <td>{{ \App\Helpers\IndianCurrency::format($s->amount_expected) }}</td>
-                <td>{{ \App\Helpers\IndianCurrency::format($s->amount_collected) }}</td>
-                <td><span style="color:#6366f1;">{{ \App\Helpers\IndianCurrency::format($s->interest_accrued) }}</span></td>
-                <td>
-                    @php $balDue = max(0, (float)$s->amount_expected - (float)$s->amount_collected); @endphp
-                    @if($balDue > 0)
-                        <span style="color:#ef4444;font-weight:600;">{{ \App\Helpers\IndianCurrency::format($balDue) }}</span>
-                    @else
-                        <span style="color:#10b981;">—</span>
-                    @endif
-                </td>
-                <td>{{ $s->collection_date ? \Carbon\Carbon::parse($s->collection_date)->format('d-M-Y') : '—' }}</td>
-                <td><span class="sch-status-{{ $s->status }}">{{ ucfirst($s->status) }}</span></td>
-            </tr>
-        @endforeach
+            <!-- Loaded via AJAX -->
         </tbody>
     </table>
 </div>
 
 {{-- ── Transaction History ──────────────────────────────────────────────────── --}}
-@if($transactions->count())
 <div class="panel" style="margin-top:24px;">
     <div class="panel-header-action mb-4"><h3 class="panel-title">Collection Transactions</h3></div>
-    <table class="data-table">
+    <table class="data-table" id="txnTable">
         <thead>
             <tr>
                 <th>Receipt No</th>
@@ -163,20 +144,10 @@
             </tr>
         </thead>
         <tbody>
-        @foreach($transactions as $txn)
-            <tr>
-                <td><span class="mono-code" style="font-size:.78rem;">{{ $txn->receipt_no }}</span></td>
-                <td>{{ $txn->collection_date->format('d-M-Y') }}</td>
-                <td><strong style="color:#10b981;">{{ \App\Helpers\IndianCurrency::format($txn->amount_collected) }}</strong></td>
-                <td>{{ strtoupper(str_replace('_',' ', $txn->payment_mode)) }}</td>
-                <td>{{ $txn->collected_by }}</td>
-                <td style="font-size:.8rem;color:var(--text-muted);">{{ $txn->remarks }}</td>
-            </tr>
-        @endforeach
+            <!-- Loaded via AJAX -->
         </tbody>
     </table>
 </div>
-@endif
 
 {{-- ── Collect Modal ────────────────────────────────────────────────────────── --}}
 <div id="collectModal" class="collect-modal-overlay">
@@ -223,7 +194,202 @@
 @endsection
 
 @push('scripts')
+<style>
+/* ── DataTable Polish (Outfit font & rounded aesthetics) ── */
+.dataTables_wrapper {
+    margin-top: 12px;
+}
+
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter {
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.dataTables_wrapper .dataTables_filter input {
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    padding: 8px 16px;
+    font-family: inherit;
+    font-size: 13px;
+    background: var(--surface-light);
+    outline: none;
+    margin-left: 8px;
+    transition: var(--transition-smooth);
+}
+
+.dataTables_wrapper .dataTables_filter input:focus {
+    border-color: var(--brand-500);
+    box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
+}
+
+.dataTables_wrapper .dataTables_length select {
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    margin: 0 4px;
+    background: var(--surface-light);
+}
+
+.dataTables_wrapper .dataTables_info {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    padding-top: 16px;
+}
+
+.dataTables_wrapper .dataTables_paginate {
+    padding-top: 16px;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    border-radius: 8px !important;
+    border: 1px solid transparent !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    padding: 6px 12px !important;
+    color: var(--text-secondary) !important;
+    transition: var(--transition-smooth);
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    background: var(--brand-50) !important;
+    color: var(--brand-600) !important;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button.current,
+.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+    background: var(--brand-600) !important;
+    color: white !important;
+    box-shadow: 0 2px 6px rgba(29, 78, 216, 0.3) !important;
+}
+</style>
+
 <script>
-$('#schedTable').DataTable({ paging: false, searching: false, ordering: false });
+    $(document).ready(function() {
+        $('#schedTable').DataTable({
+            "processing": true,
+            "serverSide": false,
+            "ajax": {
+                "url": "{{ route('sms.savings.schedule.data', $account->id) }}",
+                "type": "GET",
+            },
+            "columns": [
+                { "data": "installment_no" },
+                { 
+                    "data": "due_date",
+                    "render": function(data) {
+                        if (!data) return '—';
+                        let d = new Date(data);
+                        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
+                    }
+                },
+                { 
+                    "data": "amount_expected",
+                    "render": function(data) {
+                        return data ? parseFloat(data).toLocaleString('en-IN', { style: 'currency', currency: 'INR' }) : '—';
+                    }
+                },
+                { 
+                    "data": "amount_collected",
+                    "render": function(data) {
+                        return data ? parseFloat(data).toLocaleString('en-IN', { style: 'currency', currency: 'INR' }) : '—';
+                    }
+                },
+                { 
+                    "data": "interest_accrued",
+                    "render": function(data) {
+                        let amt = data ? parseFloat(data).toLocaleString('en-IN', { style: 'currency', currency: 'INR' }) : '—';
+                        return '<span style="color:#6366f1;">' + amt + '</span>';
+                    }
+                },
+                { 
+                    "data": null,
+                    "render": function(data, type, row) {
+                        let expected = row.amount_expected ? parseFloat(row.amount_expected) : 0;
+                        let collected = row.amount_collected ? parseFloat(row.amount_collected) : 0;
+                        let balDue = Math.max(0, expected - collected);
+                        if (balDue > 0) {
+                            return '<span style="color:#ef4444;font-weight:600;">' + balDue.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }) + '</span>';
+                        }
+                        return '<span style="color:#10b981;">—</span>';
+                    }
+                },
+                { 
+                    "data": "collection_date",
+                    "render": function(data) {
+                        if (!data) return '—';
+                        let d = new Date(data);
+                        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
+                    }
+                },
+                { 
+                    "data": "status",
+                    "render": function(data) {
+                        let status = data ? data.charAt(0).toUpperCase() + data.slice(1) : '';
+                        return '<span class="sch-status-' + data + '">' + status + '</span>';
+                    }
+                }
+            ],
+            "createdRow": function(row, data, dataIndex) {
+                if (data.status === 'missed') {
+                    $(row).addClass('overdue-row');
+                }
+            },
+            "paging": true,
+            "searching": false,
+            "ordering": false
+        });
+
+        $('#txnTable').DataTable({
+            "processing": true,
+            "serverSide": false,
+            "ajax": {
+                "url": "{{ route('sms.savings.transactions.data', $account->id) }}",
+                "type": "GET",
+            },
+            "columns": [
+                { 
+                    "data": "receipt_no",
+                    "render": function(data) {
+                        return '<span class="mono-code" style="font-size:.78rem;">' + (data || '') + '</span>';
+                    }
+                },
+                { 
+                    "data": "collection_date",
+                    "render": function(data) {
+                        if (!data) return '—';
+                        let d = new Date(data);
+                        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
+                    }
+                },
+                { 
+                    "data": "amount_collected",
+                    "render": function(data) {
+                        let amt = data ? parseFloat(data).toLocaleString('en-IN', { style: 'currency', currency: 'INR' }) : '—';
+                        return '<strong style="color:#10b981;">' + amt + '</strong>';
+                    }
+                },
+                { 
+                    "data": "payment_mode",
+                    "render": function(data) {
+                        return data ? data.replace(/_/g, ' ').toUpperCase() : '';
+                    }
+                },
+                { "data": "collected_by" },
+                { 
+                    "data": "remarks",
+                    "render": function(data) {
+                        return '<span style="font-size:.8rem;color:var(--text-muted);">' + (data || '') + '</span>';
+                    }
+                }
+            ],
+            "paging": true,
+            "searching": false,
+            "ordering": false
+        });
+    });
 </script>
 @endpush

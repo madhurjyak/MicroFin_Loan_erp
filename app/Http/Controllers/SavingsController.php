@@ -24,6 +24,26 @@ class SavingsController extends Controller
      */
     public function index(Request $request)
     {
+        // Summary stats
+        $totalSavingsMobilized = SavingsAccount::sum('total_principal_collected');
+        $totalInterestAccrued  = SavingsAccount::sum('total_interest_accrued');
+        $totalSavingsAccounts  = SavingsAccount::where('status', 'active')->count();
+        $activeCount           = $totalSavingsAccounts;
+        $maturingThisMonth = SavingsAccount::where('status', 'active')
+            ->whereMonth('maturity_date', now()->month)
+            ->whereYear('maturity_date', now()->year)
+            ->count();
+
+        return view('sms.index', compact(
+            'totalSavingsMobilized', 'totalInterestAccrued', 'totalSavingsAccounts', 'activeCount', 'maturingThisMonth'
+        ));
+    }
+
+    /**
+     * Get data for DataTables (index page).
+     */
+    public function data(Request $request)
+    {
         $query = SavingsAccount::with(['customer.group.center'])
             ->withCount(['schedules as total_installments'])
             ->withCount(['schedules as paid_installments' => fn($q) => $q->where('status', 'paid')])
@@ -39,21 +59,7 @@ class SavingsController extends Controller
             })->orWhere('account_no', 'like', '%' . $request->search . '%');
         }
 
-        $accounts = $query->latest()->paginate(25);
-
-        // Summary stats
-        $totalSavingsMobilized = SavingsAccount::sum('total_principal_collected');
-        $totalInterestAccrued  = SavingsAccount::sum('total_interest_accrued');
-        $totalSavingsAccounts  = SavingsAccount::where('status', 'active')->count();
-        $activeCount           = $totalSavingsAccounts;
-        $maturingThisMonth = SavingsAccount::where('status', 'active')
-            ->whereMonth('maturity_date', now()->month)
-            ->whereYear('maturity_date', now()->year)
-            ->count();
-
-        return view('sms.index', compact(
-            'accounts', 'totalSavingsMobilized', 'totalInterestAccrued', 'totalSavingsAccounts', 'activeCount', 'maturingThisMonth'
-        ));
+        return response()->json(['data' => $query->latest()->get()]);
     }
 
     /**
@@ -66,19 +72,35 @@ class SavingsController extends Controller
             'schedules',
         ])->findOrFail($id);
 
-        $transactions = CollectionTransaction::where('savings_account_id', $account->id)
-            ->orderByDesc('collection_date')
-            ->limit(50)
-            ->get();
-
         $paidInstallments    = $account->schedules->where('status', 'paid')->count();
         $pendingInstallments = $account->schedules->whereIn('status', ['pending', 'partial'])->count();
         $missedInstallments  = $account->schedules->where('status', 'missed')->count();
 
         return view('sms.show', compact(
-            'account', 'transactions',
-            'paidInstallments', 'pendingInstallments', 'missedInstallments'
+            'account', 'paidInstallments', 'pendingInstallments', 'missedInstallments'
         ));
+    }
+
+    /**
+     * API: Return schedule data for DataTables
+     */
+    public function scheduleData(int $id)
+    {
+        $schedules = SavingsSchedule::where('savings_account_id', $id)
+            ->orderBy('installment_no', 'asc')
+            ->get();
+        return response()->json(['data' => $schedules]);
+    }
+
+    /**
+     * API: Return transactions data for DataTables
+     */
+    public function transactionsData(int $id)
+    {
+        $transactions = CollectionTransaction::where('savings_account_id', $id)
+            ->orderByDesc('collection_date')
+            ->get();
+        return response()->json(['data' => $transactions]);
     }
 
     /**

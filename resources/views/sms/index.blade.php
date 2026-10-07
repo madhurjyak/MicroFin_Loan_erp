@@ -7,10 +7,6 @@
 <style>
 .progress-mini  { height: 6px; background: var(--border-light); border-radius: 4px; overflow: hidden; }
 .progress-mini-fill { height: 100%; background: linear-gradient(90deg, var(--brand-500), var(--brand-400)); border-radius: 4px; }
-/* Fix for Laravel Tailwind pagination SVG icons size */
-.w-5 { width: 1.25rem; }
-.h-5 { height: 1.25rem; }
-nav[role="navigation"] { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 </style>
 @endpush
 
@@ -103,71 +99,200 @@ nav[role="navigation"] { display: flex; align-items: center; justify-content: sp
             </tr>
         </thead>
         <tbody>
-        @forelse($accounts as $account)
-            @php
-                $paidCount  = $account->paid_installments ?? 0;
-                $totalCount = $account->total_installments ?? 1;
-                $pct        = $totalCount > 0 ? round(($paidCount / $totalCount) * 100) : 0;
-                $missed     = $account->missed_installments ?? 0;
-            @endphp
-            <tr>
-                <td>
-                    <span class="mono-code" style="font-size:.82rem;">{{ $account->account_no }}</span>
-                </td>
-                <td>
-                    <div class="member-info">
-                        <strong>{{ $account->customer->full_name }}</strong>
-                        <small class="text-muted">{{ $account->customer->customer_code }}</small>
-                    </div>
-                </td>
-                <td>
-                    <small>{{ $account->customer->group->group_name ?? '—' }}</small><br>
-                    <small class="text-muted">{{ $account->customer->group->center->center_name ?? '—' }}</small>
-                </td>
-                <td>
-                    <strong>{{ \App\Helpers\IndianCurrency::format($account->deposit_amount) }}</strong>
-                    <span class="text-muted"> / {{ $account->frequency }}</span>
-                </td>
-                <td>{{ $account->interest_rate }}% p.a.</td>
-                <td><strong>{{ \App\Helpers\IndianCurrency::format($account->total_principal_collected) }}</strong></td>
-                <td><span style="color:#10b981;">{{ \App\Helpers\IndianCurrency::format($account->total_interest_accrued) }}</span></td>
-                <td style="min-width:120px;">
-                    <div style="font-size:.75rem;color:var(--text-secondary);margin-bottom:3px;">
-                        {{ $paidCount }}/{{ $totalCount }} installments
-                        @if($missed > 0) <span style="color:#ef4444;">({{ $missed }} missed)</span>@endif
-                    </div>
-                    <div class="progress-mini">
-                        <div class="progress-mini-fill" style="width:{{ $pct }}%;"></div>
-                    </div>
-                </td>
-                <td>
-                    @if($account->status === 'active')
-                        <span class="badge-std">Active</span>
-                    @elseif($account->status === 'closed')
-                        <span class="badge-sma0">Closed</span>
-                    @else
-                        <span class="badge-npa">{{ ucfirst($account->status) }}</span>
-                    @endif
-                </td>
-                <td>
-                    <a href="{{ route('sms.savings.show', $account->id) }}" class="btn-primary-sm">View</a>
-                </td>
-            </tr>
-        @empty
-            <tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:2rem;">No RD accounts found.</td></tr>
-        @endforelse
+            <!-- Data will be loaded via AJAX -->
         </tbody>
     </table>
 
-    <div style="padding:1rem 1.5rem;">
-        {{ $accounts->withQueryString()->links() }}
-    </div>
 </div>
 
 @endsection
 
 @push('scripts')
+<style>
+/* ── DataTable Polish (Outfit font & rounded aesthetics) ── */
+.dataTables_wrapper {
+    margin-top: 12px;
+}
+
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter {
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.dataTables_wrapper .dataTables_filter input {
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    padding: 8px 16px;
+    font-family: inherit;
+    font-size: 13px;
+    background: var(--surface-light);
+    outline: none;
+    margin-left: 8px;
+    transition: var(--transition-smooth);
+}
+
+.dataTables_wrapper .dataTables_filter input:focus {
+    border-color: var(--brand-500);
+    box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
+}
+
+.dataTables_wrapper .dataTables_length select {
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    margin: 0 4px;
+    background: var(--surface-light);
+}
+
+.dataTables_wrapper .dataTables_info {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    padding-top: 16px;
+}
+
+.dataTables_wrapper .dataTables_paginate {
+    padding-top: 16px;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    border-radius: 8px !important;
+    border: 1px solid transparent !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    padding: 6px 12px !important;
+    color: var(--text-secondary) !important;
+    transition: var(--transition-smooth);
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    background: var(--brand-50) !important;
+    color: var(--brand-600) !important;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button.current,
+.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+    background: var(--brand-600) !important;
+    color: white !important;
+    box-shadow: 0 2px 6px rgba(29, 78, 216, 0.3) !important;
+}
+</style>
+
 <script>
-$('#savingsTable').DataTable({ paging: false, searching: false, ordering: true });
+    $(document).ready(function() {
+        $('#savingsTable').DataTable({
+            "processing": true,
+            "serverSide": false,
+            "ajax": {
+                "url": "{{ route('sms.savings.data') }}",
+                "type": "GET",
+            },
+            "columns": [
+                { 
+                    "data": "account_no",
+                    "render": function(data, type, row) {
+                        return '<span class="mono-code" style="font-size:.82rem;">' + (data || '') + '</span>';
+                    }
+                },
+                { 
+                    "data": "customer",
+                    "render": function(data, type, row) {
+                        let fullName = data ? (data.full_name || '') : '';
+                        let code = data ? (data.customer_code || '') : '';
+                        return '<div class="member-info">' +
+                               '<strong>' + fullName + '</strong>' +
+                               '<small class="text-muted" style="display:block;">' + code + '</small>' +
+                               '</div>';
+                    }
+                },
+                { 
+                    "data": "customer",
+                    "render": function(data, type, row) {
+                        let groupName = (data && data.group) ? (data.group.group_name || '—') : '—';
+                        let centerName = (data && data.group && data.group.center) ? (data.group.center.center_name || '—') : '—';
+                        return '<small>' + groupName + '</small><br>' +
+                               '<small class="text-muted">' + centerName + '</small>';
+                    }
+                },
+                { 
+                    "data": "deposit_amount",
+                    "render": function(data, type, row) {
+                        let amt = data ? parseFloat(data).toLocaleString('en-IN', { style: 'currency', currency: 'INR' }) : '₹0.00';
+                        let freq = row.frequency || '';
+                        return '<strong>' + amt + '</strong>' +
+                               '<span class="text-muted"> / ' + freq + '</span>';
+                    }
+                },
+                { 
+                    "data": "interest_rate",
+                    "render": function(data, type, row) {
+                        return (data || '0') + '% p.a.';
+                    }
+                },
+                { 
+                    "data": "total_principal_collected",
+                    "render": function(data, type, row) {
+                        let amt = data ? parseFloat(data).toLocaleString('en-IN', { style: 'currency', currency: 'INR' }) : '₹0.00';
+                        return '<strong>' + amt + '</strong>';
+                    }
+                },
+                { 
+                    "data": "total_interest_accrued",
+                    "render": function(data, type, row) {
+                        let amt = data ? parseFloat(data).toLocaleString('en-IN', { style: 'currency', currency: 'INR' }) : '₹0.00';
+                        return '<span style="color:#10b981;">' + amt + '</span>';
+                    }
+                },
+                { 
+                    "data": null,
+                    "render": function(data, type, row) {
+                        let paidCount = row.paid_installments || 0;
+                        let totalCount = row.total_installments || 1;
+                        let pct = totalCount > 0 ? Math.round((paidCount / totalCount) * 100) : 0;
+                        let missed = row.missed_installments || 0;
+                        let missedHtml = missed > 0 ? ' <span style="color:#ef4444;">(' + missed + ' missed)</span>' : '';
+                        
+                        return '<div style="font-size:.75rem;color:var(--text-secondary);margin-bottom:3px;">' +
+                               paidCount + '/' + totalCount + ' installments' + missedHtml +
+                               '</div>' +
+                               '<div class="progress-mini">' +
+                               '<div class="progress-mini-fill" style="width:' + pct + '%;"></div>' +
+                               '</div>';
+                    }
+                },
+                { 
+                    "data": "status",
+                    "render": function(data, type, row) {
+                        if(data === 'active') {
+                            return '<span class="badge-std">Active</span>';
+                        } else if(data === 'closed') {
+                            return '<span class="badge-sma0">Closed</span>';
+                        } else {
+                            let status = data ? data.charAt(0).toUpperCase() + data.slice(1) : '';
+                            return '<span class="badge-npa">' + status + '</span>';
+                        }
+                    }
+                },
+                { 
+                    "data": "id",
+                    "orderable": false,
+                    "render": function(data, type, row) {
+                        let url = '{{ route("sms.savings.show", ":id") }}'.replace(':id', data);
+                        return '<a href="' + url + '" class="btn-primary-sm">View</a>';
+                    }
+                }
+            ],
+            "order": [[ 0, "desc" ]],
+            "pageLength": 10,
+            "language": {
+                "search": "",
+                "searchPlaceholder": "🔍 Search accounts...",
+                "emptyTable": '<div style="text-align:center;color:var(--text-muted);padding:2rem;">No RD accounts found.</div>'
+            }
+        });
+    });
 </script>
 @endpush
