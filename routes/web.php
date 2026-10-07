@@ -46,14 +46,17 @@ Route::middleware('auth')->group(function () {
         Route::post('/apply', [LosController::class, 'store'])->name('store');
         Route::get('/my-applications', [LosController::class, 'myApplications'])->name('my-applications');
         Route::get('/center', [LosController::class, 'center'])->name('center');
+        Route::get('/center/data', [LosController::class, 'centerData'])->name('center.data');
         Route::post('/center', [LosController::class, 'storeCenter'])->name('center.store');
         Route::put('/center/{id}', [LosController::class, 'updateCenter'])->name('center.update');
         Route::delete('/center/{id}', [LosController::class, 'destroyCenter'])->name('center.destroy');
         Route::get('/group', [LosController::class, 'group'])->name('group');
+        Route::get('/group/data', [LosController::class, 'groupData'])->name('group.data');
         Route::post('/group', [LosController::class, 'storeGroup'])->name('group.store');
         Route::put('/group/{id}', [LosController::class, 'updateGroup'])->name('group.update');
         Route::delete('/group/{id}', [LosController::class, 'destroyGroup'])->name('group.destroy');
         Route::get('/member', [LosController::class, 'member'])->name('member');
+        Route::get('/member/data', [LosController::class, 'memberData'])->name('member.data');
         Route::post('/member', [LosController::class, 'storeMember'])->name('member.store');
         Route::put('/member/{id}', [LosController::class, 'updateMember'])->name('member.update');
         Route::delete('/member/{id}', [LosController::class, 'destroyMember'])->name('member.destroy');

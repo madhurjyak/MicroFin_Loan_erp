@@ -97,91 +97,7 @@
                 </tr>
             </thead>
             <tbody>
-                @forelse($centers as $center)
-                <tr>
-                    <td class="font-mono font-medium" style="color: var(--brand-600);">
-                        #{{ str_pad($center->id, 3, '0', STR_PAD_LEFT) }}
-                    </td>
-                    <td>
-                        <div class="font-medium" style="color: var(--text-primary); font-size: 14px;">
-                            {{ $center->center_name }}
-                        </div>
-                        <span class="font-mono text-muted" style="display: inline-block; font-size: 11px; background: var(--brand-50); color: var(--brand-600); padding: 2px 8px; border-radius: 6px; font-weight: 600; margin-top: 2px;">
-                            {{ $center->center_code }}
-                        </span>
-                    </td>
-                    <td class="font-medium" style="color: var(--text-secondary);">
-                        {{ $center->branch_name }}
-                    </td>
-                    <td>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <span class="badge-sma0" style="background: #fef3c7; color: #92400e; font-weight: 600;">
-                                📅 {{ $center->meeting_day }}
-                            </span>
-                            <span class="text-muted" style="font-size: 12px; font-weight: 500;">
-                                {{ \Carbon\Carbon::parse($center->meeting_time)->format('h:i A') }}
-                            </span>
-                        </div>
-                    </td>
-                    <td>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <div style="width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, var(--brand-100), var(--brand-50)); color: var(--brand-600); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;">
-                                {{ strtoupper(substr($center->field_officer, 0, 2)) }}
-                            </div>
-                            <span class="font-medium" style="color: var(--text-primary);">
-                                {{ $center->field_officer }}
-                            </span>
-                        </div>
-                    </td>
-                    <td class="text-center">
-                        <span class="badge-std" style="font-size: 12px; padding: 4px 12px;">
-                            {{ $center->groups->count() }} {{ Str::plural('Group', $center->groups->count()) }}
-                        </span>
-                    </td>
-                    <td class="text-muted" style="font-size: 13px;">
-                        {{ $center->created_at->format('d M Y') }}
-                    </td>
-                    <td class="text-right">
-                        <div class="actions-btn-group">
-                            {{-- View Button --}}
-                            <button type="button" class="btn-action-view" onclick="viewCenter({{ json_encode($center) }})" title="View Details" aria-label="View Details">
-                                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                </svg>
-                            </button>
-
-                            {{-- Edit Button --}}
-                            <button type="button" class="btn-action-edit" onclick="openEditCenterModal({{ json_encode($center) }})" title="Edit Center" aria-label="Edit Center">
-                                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                </svg>
-                            </button>
-
-                            {{-- Delete Button --}}
-                            <form action="{{ route('los.center.destroy', $center->id) }}" method="POST" style="display: inline-block; margin: 0;" onsubmit="return confirm('Are you sure you want to delete center \'{{ $center->center_name }}\'?');">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn-action-delete" title="Delete Center" aria-label="Delete Center">
-                                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                    </svg>
-                                </button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-                @empty
-                <tr>
-                    <td colspan="8" class="empty-state">
-                        <p style="font-size: 20px; margin-bottom: 8px;">🏛️ No Kendra Centers Found</p>
-                        <p class="text-muted mb-4">Get started by setting up your first branch collection center</p>
-                        <button type="button" class="btn-primary" onclick="openModal(document.getElementById('newCenterModal'))">
-                            + Create First Center
-                        </button>
-                    </td>
-                </tr>
-                @endforelse
+                <!-- Data will be loaded via AJAX -->
             </tbody>
         </table>
     </div>
@@ -591,11 +507,115 @@
 <script>
     $(document).ready(function() {
         $('#centersTable').DataTable({
+            "processing": true,
+            "serverSide": false, // Set to true if you are using Yajra DataTables in the backend
+            "ajax": {
+                "url": "{{ route('los.center.data') }}", // Make sure to define this route in web.php
+                "type": "GET",
+                // "dataSrc": "" // Uncomment this if your API returns a raw array instead of { data: [...] }
+            },
+            "columns": [
+                { 
+                    "data": "id",
+                    "render": function(data, type, row) {
+                        return '<span class="font-mono font-medium" style="color: var(--brand-600);">#' + String(data).padStart(3, '0') + '</span>';
+                    }
+                },
+                { 
+                    "data": "center_name",
+                    "render": function(data, type, row) {
+                        return '<div class="font-medium" style="color: var(--text-primary); font-size: 14px;">' + (row.center_name || '') + '</div>' +
+                               '<span class="font-mono text-muted" style="display: inline-block; font-size: 11px; background: var(--brand-50); color: var(--brand-600); padding: 2px 8px; border-radius: 6px; font-weight: 600; margin-top: 2px;">' +
+                               (row.center_code || '') + '</span>';
+                    }
+                },
+                { 
+                    "data": "branch_name",
+                    "className": "font-medium",
+                    "render": function(data, type, row) {
+                        return '<span style="color: var(--text-secondary);">' + (row.branch_name || '') + '</span>';
+                    }
+                },
+                { 
+                    "data": "meeting_day",
+                    "render": function(data, type, row) {
+                        let time = row.meeting_time ? row.meeting_time.substring(0, 5) : '';
+                        let formattedTime = time;
+                        if(time) {
+                            let [h, m] = time.split(':');
+                            let ampm = h >= 12 ? 'PM' : 'AM';
+                            h = h % 12 || 12;
+                            formattedTime = ('0' + h).slice(-2) + ':' + m + ' ' + ampm;
+                        }
+                        return '<div style="display: flex; align-items: center; gap: 8px;">' +
+                               '<span class="badge-sma0" style="background: #fef3c7; color: #92400e; font-weight: 600;">📅 ' + (row.meeting_day || '') + '</span>' +
+                               '<span class="text-muted" style="font-size: 12px; font-weight: 500;">' + formattedTime + '</span>' +
+                               '</div>';
+                    }
+                },
+                { 
+                    "data": "field_officer",
+                    "render": function(data, type, row) {
+                        let initials = row.field_officer ? row.field_officer.substring(0, 2).toUpperCase() : '';
+                        return '<div style="display: flex; align-items: center; gap: 8px;">' +
+                               '<div style="width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, var(--brand-100), var(--brand-50)); color: var(--brand-600); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;">' + initials + '</div>' +
+                               '<span class="font-medium" style="color: var(--text-primary);">' + (row.field_officer || '') + '</span>' +
+                               '</div>';
+                    }
+                },
+                { 
+                    "data": "groups_count", 
+                    "className": "text-center",
+                    "defaultContent": "0",
+                    "render": function(data, type, row) {
+                        let count = data !== undefined && data !== null ? data : (row.groups ? row.groups.length : 0);
+                        let text = count === 1 ? 'Group' : 'Groups';
+                        return '<span class="badge-std" style="font-size: 12px; padding: 4px 12px;">' + count + ' ' + text + '</span>';
+                    }
+                },
+                { 
+                    "data": "created_at",
+                    "className": "text-muted",
+                    "render": function(data, type, row) {
+                        if (!data) return '';
+                        let d = new Date(data);
+                        return '<span style="font-size: 13px;">' + d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + '</span>';
+                    }
+                },
+                {
+                    "data": "id",
+                    "className": "text-right",
+                    "orderable": false,
+                    "render": function(data, type, row) {
+                        let encodedRow = encodeURIComponent(JSON.stringify(row)).replace(/'/g, "%27");
+                        let csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '{{ csrf_token() }}';
+                        
+                        return '<div class="actions-btn-group">' +
+                               '<button type="button" class="btn-action-view" onclick="viewCenter(JSON.parse(decodeURIComponent(\'' + encodedRow + '\')))" title="View Details" aria-label="View Details">' +
+                               '<svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>' +
+                               '</button>' +
+                               
+                               '<button type="button" class="btn-action-edit" onclick="openEditCenterModal(JSON.parse(decodeURIComponent(\'' + encodedRow + '\')))" title="Edit Center" aria-label="Edit Center">' +
+                               '<svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>' +
+                               '</button>' +
+                               
+                               '<form action="/los/center/' + row.id + '" method="POST" style="display: inline-block; margin: 0;" onsubmit="return confirm(\'Are you sure you want to delete center \\\'' + (row.center_name || '') + '\\\'?\');">' +
+                               '<input type="hidden" name="_token" value="' + csrfToken + '">' +
+                               '<input type="hidden" name="_method" value="DELETE">' +
+                               '<button type="submit" class="btn-action-delete" title="Delete Center" aria-label="Delete Center">' +
+                               '<svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>' +
+                               '</button>' +
+                               '</form>' +
+                               '</div>';
+                    }
+                }
+            ],
             "order": [[ 0, "desc" ]],
             "pageLength": 10,
             "language": {
                 "search": "",
-                "searchPlaceholder": "🔍 Search centers, codes, officers..."
+                "searchPlaceholder": "🔍 Search centers, codes, officers...",
+                "emptyTable": '<div class="empty-state" style="padding: 24px;"><p style="font-size: 20px; margin-bottom: 8px;">🏛️ No Kendra Centers Found</p><p class="text-muted mb-4">Get started by setting up your first branch collection center</p><button type="button" class="btn-primary" onclick="openModal(document.getElementById(\'newCenterModal\'))">+ Create First Center</button></div>'
             }
         });
     });

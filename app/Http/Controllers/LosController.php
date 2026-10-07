@@ -107,6 +107,17 @@ class LosController extends Controller
     }
 
     /**
+     * GET /los/center/data — Get centers data for DataTables via AJAX
+     */
+    public function centerData(Request $request)
+    {
+        $centers = Center::with('groups')->orderByDesc('id')->get();
+        return response()->json([
+            'data' => $centers
+        ]);
+    }
+
+    /**
      * POST /los/center — Store a new center
      */
     public function storeCenter(Request $request)
@@ -174,6 +185,17 @@ class LosController extends Controller
     }
 
     /**
+     * GET /los/group/data — Get groups data for DataTables via AJAX
+     */
+    public function groupData(Request $request)
+    {
+        $groups = Group::with(['center', 'customers'])->orderByDesc('id')->get();
+        return response()->json([
+            'data' => $groups
+        ]);
+    }
+
+    /**
      * POST /los/group — Store a new group
      */
     public function storeGroup(Request $request)
@@ -234,6 +256,19 @@ class LosController extends Controller
         $members = Customer::with(['group.center', 'loans'])->orderBy('full_name')->get();
         $groups  = Group::with('center')->orderBy('group_name')->get();
         return view('los.group.member', compact('members', 'groups'));
+    }
+
+    /**
+     * GET /los/member/data — Get members data for DataTables via AJAX
+     */
+    public function memberData(Request $request)
+    {
+        $members = Customer::with(['group.center', 'loans'])->orderByDesc('id')->get();
+        $members->each->append(['foir_percent', 'masked_aadhaar']);
+        
+        return response()->json([
+            'data' => $members
+        ]);
     }
 
     /**

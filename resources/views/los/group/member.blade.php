@@ -105,120 +105,7 @@
                 </tr>
             </thead>
             <tbody>
-                @forelse($members as $m)
-                <tr>
-                    <td class="font-mono font-medium" style="color: var(--brand-600);">
-                        #CUS-{{ str_pad($m->id, 3, '0', STR_PAD_LEFT) }}
-                    </td>
-                    <td>
-                        <div class="font-medium" style="color: var(--text-primary); font-size: 14px; display: flex; align-items: center; gap: 6px;">
-                            <span>{{ $m->full_name }}</span>
-                        </div>
-                        <div class="text-muted" style="font-size: 12px; margin-top: 2px;">
-                            📞 {{ $m->phone }}
-                        </div>
-                    </td>
-                    <td>
-                        @if($m->group)
-                        <div class="font-medium" style="color: var(--text-primary);">
-                            {{ $m->group->group_name }}
-                        </div>
-                        @if($m->group->center)
-                        <div class="text-muted" style="font-size: 11px;">
-                            🏛️ {{ $m->group->center->center_name }}
-                        </div>
-                        @endif
-                        @else
-                        <span class="text-muted">—</span>
-                        @endif
-                    </td>
-                    <td>
-                        <div class="font-mono" style="font-size: 12px; font-weight: 500; color: var(--text-secondary);">
-                            {{ $m->masked_aadhaar }}
-                        </div>
-                        @if($m->pan_number)
-                        <span class="font-mono text-muted" style="font-size: 11px; background: var(--brand-50); color: var(--brand-600); padding: 1px 6px; border-radius: 4px;">
-                            PAN: {{ $m->pan_number }}
-                        </span>
-                        @endif
-                    </td>
-                    <td class="text-right">
-                        <div class="font-medium" style="color: var(--text-primary);">
-                            ₹{{ number_format($m->annual_household_income, 0, '.', ',') }}
-                        </div>
-                        <div class="text-muted" style="font-size: 11px;">
-                            Debt: ₹{{ number_format($m->monthly_debt_obligations, 0, '.', ',') }}/mo
-                        </div>
-                    </td>
-                    <td class="text-center">
-                        @php
-                        $foir = $m->foir_percent;
-                        @endphp
-                        @if($foir <= 40)
-                            <span class="badge-std" style="font-size: 11px;">
-                            {{ $foir }}% Safe
-                            </span>
-                            @elseif($foir <= 50)
-                                <span class="badge-sma0" style="font-size: 11px; background: #fef3c7; color: #92400e;">
-                                {{ $foir }}% Caution
-                                </span>
-                                @else
-                                <span class="badge-npa" style="font-size: 11px;">
-                                    {{ $foir }}% High
-                                </span>
-                                @endif
-                    </td>
-                    <td class="text-center">
-                        @php $activeCount = $m->loans->where('status', 'active')->count(); @endphp
-                        @if($activeCount > 0)
-                        <span class="badge-std" style="background: #e0f2fe; color: #0369a1; border-color: #bae6fd;">
-                            {{ $activeCount }} Active
-                        </span>
-                        @else
-                        <span class="text-muted" style="font-size: 12px;">None</span>
-                        @endif
-                    </td>
-                    <td class="text-right">
-                        <div class="actions-btn-group">
-                            {{-- View Button --}}
-                            <button type="button" class="btn-action-view" onclick="viewMember({{ json_encode($m) }})" title="View Details" aria-label="View Details">
-                                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
-                            </button>
-
-                            {{-- Edit Button --}}
-                            <button type="button" class="btn-action-edit" onclick="openEditMemberModal({{ json_encode($m) }})" title="Edit Member" aria-label="Edit Member">
-                                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                            </button>
-
-                            {{-- Delete Button --}}
-                            <form action="{{ route('los.member.destroy', $m->id) }}" method="POST" style="display: inline-block; margin: 0;" onsubmit="return confirm('Are you sure you want to delete member \'{{ $m->full_name }}\'?');">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn-action-delete" title="Delete Member" aria-label="Delete Member">
-                                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                </button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-                @empty
-                <tr>
-                    <td colspan="8" class="empty-state">
-                        <p style="font-size: 20px; margin-bottom: 8px;">🧑‍🤝‍🧑 No Members Registered</p>
-                        <p class="text-muted mb-4">Enroll your first Kendra borrower and associate them with a JLG group</p>
-                        <button type="button" class="btn-primary" onclick="openModal(document.getElementById('newMemberModal'))">
-                            + Enroll First Member
-                        </button>
-                    </td>
-                </tr>
-                @endforelse
+                <!-- Data will be loaded via AJAX -->
             </tbody>
         </table>
     </div>
@@ -787,13 +674,125 @@
 <script>
     $(document).ready(function() {
         $('#membersTable').DataTable({
+            "processing": true,
+            "serverSide": false,
+            "ajax": {
+                "url": "{{ route('los.member.data') }}",
+                "type": "GET"
+            },
+            "columns": [
+                { 
+                    "data": "id",
+                    "render": function(data, type, row) {
+                        return '<span class="font-mono font-medium" style="color: var(--brand-600);">#CUS-' + String(data).padStart(3, '0') + '</span>';
+                    }
+                },
+                { 
+                    "data": "full_name",
+                    "render": function(data, type, row) {
+                        return '<div class="font-medium" style="color: var(--text-primary); font-size: 14px; display: flex; align-items: center; gap: 6px;"><span>' + (row.full_name || '') + '</span></div>' +
+                               '<div class="text-muted" style="font-size: 12px; margin-top: 2px;">📞 ' + (row.phone || '') + '</div>';
+                    }
+                },
+                { 
+                    "data": "group",
+                    "render": function(data, type, row) {
+                        let html = '';
+                        if(row.group) {
+                            html += '<div class="font-medium" style="color: var(--text-primary);">' + (row.group.group_name || '') + '</div>';
+                            if(row.group.center) {
+                                html += '<div class="text-muted" style="font-size: 11px;">🏛️ ' + (row.group.center.center_name || '') + '</div>';
+                            }
+                        } else {
+                            html = '<span class="text-muted">—</span>';
+                        }
+                        return html;
+                    }
+                },
+                { 
+                    "data": "masked_aadhaar",
+                    "render": function(data, type, row) {
+                        let html = '<div class="font-mono" style="font-size: 12px; font-weight: 500; color: var(--text-secondary);">' + (data || '') + '</div>';
+                        if(row.pan_number) {
+                            html += '<span class="font-mono text-muted" style="font-size: 11px; background: var(--brand-50); color: var(--brand-600); padding: 1px 6px; border-radius: 4px;">PAN: ' + row.pan_number + '</span>';
+                        }
+                        return html;
+                    }
+                },
+                { 
+                    "data": "annual_household_income",
+                    "className": "text-right",
+                    "render": function(data, type, row) {
+                        let html = '<div class="font-medium" style="color: var(--text-primary);">₹' + (Number(data) || 0).toLocaleString('en-IN') + '</div>';
+                        html += '<div class="text-muted" style="font-size: 11px;">Debt: ₹' + (Number(row.monthly_debt_obligations) || 0).toLocaleString('en-IN') + '/mo</div>';
+                        return html;
+                    }
+                },
+                { 
+                    "data": "foir_percent",
+                    "className": "text-center",
+                    "render": function(data, type, row) {
+                        let foir = data || 0;
+                        if(foir <= 40) {
+                            return '<span class="badge-std" style="font-size: 11px;">' + foir + '% Safe</span>';
+                        } else if(foir <= 50) {
+                            return '<span class="badge-sma0" style="font-size: 11px; background: #fef3c7; color: #92400e;">' + foir + '% Caution</span>';
+                        } else {
+                            return '<span class="badge-npa" style="font-size: 11px;">' + foir + '% High</span>';
+                        }
+                    }
+                },
+                { 
+                    "data": "loans",
+                    "className": "text-center",
+                    "render": function(data, type, row) {
+                        let activeCount = 0;
+                        if(row.loans) {
+                            activeCount = row.loans.filter(l => l.status === 'active').length;
+                        }
+                        if(activeCount > 0) {
+                            return '<span class="badge-std" style="background: #e0f2fe; color: #0369a1; border-color: #bae6fd;">' + activeCount + ' Active</span>';
+                        } else {
+                            return '<span class="text-muted" style="font-size: 12px;">None</span>';
+                        }
+                    }
+                },
+                {
+                    "data": "id",
+                    "className": "text-right",
+                    "orderable": false,
+                    "render": function(data, type, row) {
+                        let encodedRow = encodeURIComponent(JSON.stringify(row)).replace(/'/g, "%27");
+                        let csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '{{ csrf_token() }}';
+                        
+                        return '<div class="actions-btn-group">' +
+                               '<button type="button" class="btn-action-view" onclick="viewMember(JSON.parse(decodeURIComponent(\'' + encodedRow + '\')))" title="View Details" aria-label="View Details">' +
+                               '<svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>' +
+                               '</button>' +
+                               
+                               '<button type="button" class="btn-action-edit" onclick="openEditMemberModal(JSON.parse(decodeURIComponent(\'' + encodedRow + '\')))" title="Edit Member" aria-label="Edit Member">' +
+                               '<svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>' +
+                               '</button>' +
+                               
+                               '<form action="/los/member/' + row.id + '" method="POST" style="display: inline-block; margin: 0;" onsubmit="return confirm(\'Are you sure you want to delete member \\\'' + (row.full_name || '') + '\\\'?\');">' +
+                               '<input type="hidden" name="_token" value="' + csrfToken + '">' +
+                               '<input type="hidden" name="_method" value="DELETE">' +
+                               '<button type="submit" class="btn-action-delete" title="Delete Member" aria-label="Delete Member">' +
+                               '<svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>' +
+                               '</button>' +
+                               '</form>' +
+                               '</div>';
+                    }
+                }
+            ],
             "order": [
                 [0, "desc"]
             ],
             "pageLength": 10,
             "language": {
                 "search": "",
-                "searchPlaceholder": "🔍 Search members, codes, Aadhaar, groups..."
+                "searchPlaceholder": "🔍 Search members, codes, Aadhaar, groups...",
+                "emptyTable": '<div class="empty-state" style="padding: 24px;"><p style="font-size: 20px; margin-bottom: 8px;">🧑‍🤝‍🧑 No Members Registered</p><p class="text-muted mb-4">Enroll your first Kendra borrower and associate them with a JLG group</p><button type="button" class="btn-primary" onclick="openModal(document.getElementById(\'newMemberModal\'))">+ Enroll First Member</button></div>'
             }
         });
     });

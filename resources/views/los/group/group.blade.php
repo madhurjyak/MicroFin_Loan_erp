@@ -96,89 +96,7 @@
                 </tr>
             </thead>
             <tbody>
-                @forelse($groups as $group)
-                <tr>
-                    <td class="font-mono font-medium" style="color: var(--brand-600);">
-                        #GRP-{{ str_pad($group->id, 3, '0', STR_PAD_LEFT) }}
-                    </td>
-                    <td>
-                        <div class="font-medium" style="color: var(--text-primary); font-size: 14px;">
-                            {{ $group->group_name }}
-                        </div>
-                    </td>
-                    <td>
-                        @if($group->center)
-                            <div style="display: flex; align-items: center; gap: 6px;">
-                                <span class="badge-sma0" style="background: #e0f2fe; color: #0369a1; font-weight: 600;">
-                                    🏛️ {{ $group->center->center_name }}
-                                </span>
-                                <span class="font-mono text-muted" style="font-size: 11px;">
-                                    {{ $group->center->center_code }}
-                                </span>
-                            </div>
-                        @else
-                            <span class="text-muted">—</span>
-                        @endif
-                    </td>
-                    <td>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <div style="width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, var(--brand-100), var(--brand-50)); color: var(--brand-600); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;">
-                                {{ strtoupper(substr($group->group_leader_name, 0, 2)) }}
-                            </div>
-                            <span class="font-medium" style="color: var(--text-primary);">
-                                {{ $group->group_leader_name }}
-                            </span>
-                        </div>
-                    </td>
-                    <td class="text-center">
-                        <span class="badge-std" style="font-size: 12px; padding: 4px 12px;">
-                            {{ $group->customers->count() }} {{ Str::plural('Member', $group->customers->count()) }}
-                        </span>
-                    </td>
-                    <td class="text-muted" style="font-size: 13px;">
-                        {{ $group->created_at->format('d M Y') }}
-                    </td>
-                    <td class="text-right">
-                        <div class="actions-btn-group">
-                            {{-- View Button --}}
-                            <button type="button" class="btn-action-view" onclick="viewGroup({{ json_encode($group) }})" title="View Details" aria-label="View Details">
-                                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                </svg>
-                            </button>
-
-                            {{-- Edit Button --}}
-                            <button type="button" class="btn-action-edit" onclick="openEditGroupModal({{ json_encode($group) }})" title="Edit Group" aria-label="Edit Group">
-                                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                </svg>
-                            </button>
-
-                            {{-- Delete Button --}}
-                            <form action="{{ route('los.group.destroy', $group->id) }}" method="POST" style="display: inline-block; margin: 0;" onsubmit="return confirm('Are you sure you want to delete group \'{{ $group->group_name }}\'?');">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn-action-delete" title="Delete Group" aria-label="Delete Group">
-                                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                    </svg>
-                                </button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-                @empty
-                <tr>
-                    <td colspan="7" class="empty-state">
-                        <p style="font-size: 20px; margin-bottom: 8px;">👥 No Groups Found</p>
-                        <p class="text-muted mb-4">Create your first Joint Liability Group linked to a Kendra center</p>
-                        <button type="button" class="btn-primary" onclick="openModal(document.getElementById('newGroupModal'))">
-                            + Create First Group
-                        </button>
-                    </td>
-                </tr>
-                @endforelse
+                <!-- Data will be loaded via AJAX -->
             </tbody>
         </table>
     </div>
@@ -562,11 +480,100 @@
 <script>
     $(document).ready(function() {
         $('#groupsTable').DataTable({
+            "processing": true,
+            "serverSide": false,
+            "ajax": {
+                "url": "{{ route('los.group.data') }}",
+                "type": "GET"
+            },
+            "columns": [
+                { 
+                    "data": "id",
+                    "render": function(data, type, row) {
+                        return '<span class="font-mono font-medium" style="color: var(--brand-600);">#GRP-' + String(data).padStart(3, '0') + '</span>';
+                    }
+                },
+                { 
+                    "data": "group_name",
+                    "render": function(data, type, row) {
+                        return '<div class="font-medium" style="color: var(--text-primary); font-size: 14px;">' + (row.group_name || '') + '</div>';
+                    }
+                },
+                { 
+                    "data": "center",
+                    "render": function(data, type, row) {
+                        if(row.center) {
+                            return '<div style="display: flex; align-items: center; gap: 6px;">' +
+                                   '<span class="badge-sma0" style="background: #e0f2fe; color: #0369a1; font-weight: 600;">🏛️ ' + (row.center.center_name || '') + '</span>' +
+                                   '<span class="font-mono text-muted" style="font-size: 11px;">' + (row.center.center_code || '') + '</span>' +
+                                   '</div>';
+                        } else {
+                            return '<span class="text-muted">—</span>';
+                        }
+                    }
+                },
+                { 
+                    "data": "group_leader_name",
+                    "render": function(data, type, row) {
+                        let initials = row.group_leader_name ? row.group_leader_name.substring(0, 2).toUpperCase() : '';
+                        return '<div style="display: flex; align-items: center; gap: 8px;">' +
+                               '<div style="width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, var(--brand-100), var(--brand-50)); color: var(--brand-600); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;">' + initials + '</div>' +
+                               '<span class="font-medium" style="color: var(--text-primary);">' + (row.group_leader_name || '') + '</span>' +
+                               '</div>';
+                    }
+                },
+                { 
+                    "data": "customers_count", 
+                    "className": "text-center",
+                    "render": function(data, type, row) {
+                        let count = data !== undefined && data !== null ? data : (row.customers ? row.customers.length : 0);
+                        let text = count === 1 ? 'Member' : 'Members';
+                        return '<span class="badge-std" style="font-size: 12px; padding: 4px 12px;">' + count + ' ' + text + '</span>';
+                    }
+                },
+                { 
+                    "data": "created_at",
+                    "className": "text-muted",
+                    "render": function(data, type, row) {
+                        if (!data) return '';
+                        let d = new Date(data);
+                        return '<span style="font-size: 13px;">' + d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + '</span>';
+                    }
+                },
+                {
+                    "data": "id",
+                    "className": "text-right",
+                    "orderable": false,
+                    "render": function(data, type, row) {
+                        let encodedRow = encodeURIComponent(JSON.stringify(row)).replace(/'/g, "%27");
+                        let csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '{{ csrf_token() }}';
+                        
+                        return '<div class="actions-btn-group">' +
+                               '<button type="button" class="btn-action-view" onclick="viewGroup(JSON.parse(decodeURIComponent(\'' + encodedRow + '\')))" title="View Details" aria-label="View Details">' +
+                               '<svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>' +
+                               '</button>' +
+                               
+                               '<button type="button" class="btn-action-edit" onclick="openEditGroupModal(JSON.parse(decodeURIComponent(\'' + encodedRow + '\')))" title="Edit Group" aria-label="Edit Group">' +
+                               '<svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>' +
+                               '</button>' +
+                               
+                               '<form action="/los/group/' + row.id + '" method="POST" style="display: inline-block; margin: 0;" onsubmit="return confirm(\'Are you sure you want to delete group \\\'' + (row.group_name || '') + '\\\'?\');">' +
+                               '<input type="hidden" name="_token" value="' + csrfToken + '">' +
+                               '<input type="hidden" name="_method" value="DELETE">' +
+                               '<button type="submit" class="btn-action-delete" title="Delete Group" aria-label="Delete Group">' +
+                               '<svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>' +
+                               '</button>' +
+                               '</form>' +
+                               '</div>';
+                    }
+                }
+            ],
             "order": [[ 0, "desc" ]],
             "pageLength": 10,
             "language": {
                 "search": "",
-                "searchPlaceholder": "🔍 Search groups, leaders, centers..."
+                "searchPlaceholder": "🔍 Search groups, leaders, centers...",
+                "emptyTable": '<div class="empty-state" style="padding: 24px;"><p style="font-size: 20px; margin-bottom: 8px;">👥 No Groups Found</p><p class="text-muted mb-4">Create your first Joint Liability Group linked to a Kendra center</p><button type="button" class="btn-primary" onclick="openModal(document.getElementById(\'newGroupModal\'))">+ Create First Group</button></div>'
             }
         });
     });
