@@ -3,16 +3,6 @@
 @section('page-title', '📊 Loan Origination Pipeline')
 
 @section('content')
-@php
-    function inrPipe(float $a): string {
-        $a = round($a,2); $p = explode('.', number_format($a, 2));
-        $int = str_replace(',', '', $p[0]); $dec = $p[1];
-        if (strlen($int) <= 3) return '₹' . $int . '.' . $dec;
-        $last3 = substr($int, -3); $rest = substr($int, 0, strlen($int) - 3);
-        $rest = preg_replace('/\B(?=(\d{2})+(?!\d))/', ',', $rest);
-        return '₹' . $rest . ',' . $last3 . '.' . $dec;
-    }
-@endphp
 
 {{-- ── Stage Cards ── --}}
 <div class="dashboard-kpi-grid">
@@ -75,75 +65,148 @@
                 </tr>
             </thead>
             <tbody>
-                @forelse($applications as $app)
-                <tr>
-                    <td class="font-mono font-medium" style="color: var(--brand-600);">{{ $app->application_no }}</td>
-                    <td>
-                        <div class="font-medium text-slate-800">{{ $app->customer->full_name }}</div>
-                        <div class="text-muted">{{ $app->customer->masked_aadhaar }}</div>
-                    </td>
-                    <td class="text-muted">
-                        {{ $app->customer->group->center->center_name ?? '—' }}
-                    </td>
-                    <td class="text-muted">
-                        {{ $app->agent->name ?? '—' }}
-                    </td>
-                    <td class="text-right font-medium text-slate-800">
-                        {!! inrPipe((float)$app->applied_amount) !!}
-                    </td>
-                    <td class="text-center">
-                        <span class="badge-{{ $app->stage === 'approved' ? 'std' : ($app->stage === 'rejected' ? 'npa' : 'sma0') }}">
-                            {{ $app->stage_label }}
-                        </span>
-                    </td>
-                    <td class="text-center text-sm">
-                        @php
-                            $totalDocs = $app->documents->count();
-                            $verifiedDocs = $app->documents->where('verification_status', 'verified')->count();
-                        @endphp
-                        <span class="{{ $verifiedDocs === $totalDocs && $totalDocs > 0 ? 'text-emerald' : 'text-muted' }}">
-                            {{ $verifiedDocs }}/{{ $totalDocs }}
-                        </span>
-                    </td>
-                    <td class="text-muted">{{ $app->created_at->format('d M') }}</td>
-                    <td class="text-center">
-                        @if(in_array($app->stage, ['submitted', 'under_review']))
-                        <a href="{{ route('los.review', $app->id) }}" class="btn-primary-sm">
-                            Review →
-                        </a>
-                        @elseif($app->stage === 'approved')
-                        <span class="text-emerald text-xs font-medium">Disbursed</span>
-                        @elseif($app->stage === 'rejected')
-                        <span class="text-rose text-xs font-medium" title="{{ $app->rejection_reason }}">Declined</span>
-                        @else
-                        <span class="text-muted">—</span>
-                        @endif
-                    </td>
-                </tr>
-                @empty
-                <tr>
-                    <td colspan="9" class="empty-state">No applications found.</td>
-                </tr>
-                @endforelse
+                <!-- Data will be loaded via AJAX -->
             </tbody>
         </table>
     </div>
-
-    @if($applications->hasPages())
-    <div style="padding: 16px; border-top: 1px solid var(--border-light);">
-        {{ $applications->links() }}
-    </div>
-    @endif
 </div>
 
 @push('scripts')
+<style>
+/* ── DataTable Polish (matching center.blade.php) ── */
+.dataTables_wrapper { margin-top: 12px; }
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter { margin-bottom: 16px; font-size: 13px; color: var(--text-secondary); }
+.dataTables_wrapper .dataTables_filter input {
+    border: 1px solid var(--border-light); border-radius: 12px; padding: 8px 16px;
+    font-family: inherit; font-size: 13px; background: var(--surface-light);
+    outline: none; margin-left: 8px; transition: var(--transition-smooth);
+}
+.dataTables_wrapper .dataTables_filter input:focus {
+    border-color: var(--brand-500); box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
+}
+.dataTables_wrapper .dataTables_length select {
+    border: 1px solid var(--border-light); border-radius: 8px; padding: 6px 12px;
+    font-family: inherit; font-size: 13px; margin: 0 4px; background: var(--surface-light);
+}
+.dataTables_wrapper .dataTables_info { font-size: 13px; color: var(--text-tertiary); padding-top: 16px; }
+.dataTables_wrapper .dataTables_paginate { padding-top: 16px; }
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    border-radius: 8px !important; border: 1px solid transparent !important;
+    font-size: 13px !important; font-weight: 500 !important; padding: 6px 12px !important;
+    color: var(--text-secondary) !important; transition: var(--transition-smooth);
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    background: var(--brand-50) !important; color: var(--brand-600) !important;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button.current,
+.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+    background: var(--brand-600) !important; color: white !important;
+    box-shadow: 0 2px 6px rgba(29, 78, 216, 0.3) !important;
+}
+</style>
 <script>
 $(document).ready(function() {
     if (!$.fn.DataTable.isDataTable('#pipelineTable')) {
         $('#pipelineTable').DataTable({
+            "processing": true,
+            "serverSide": false,
+            "ajax": {
+                "url": "{{ route('los.pipeline.data', ['stage' => $stageFilter]) }}",
+                "type": "GET"
+            },
+            "columns": [
+                {
+                    "data": "application_no",
+                    "render": function(data, type, row) {
+                        return '<span class="font-mono font-medium" style="color: var(--brand-600);">' + (data || '') + '</span>';
+                    }
+                },
+                {
+                    "data": "customer.full_name",
+                    "render": function(data, type, row) {
+                        let name = data || '—';
+                        let aadhaar = (row.customer && row.customer.masked_aadhaar) ? row.customer.masked_aadhaar : '';
+                        return '<div class="font-medium text-slate-800">' + name + '</div>' +
+                               '<div class="text-muted">' + aadhaar + '</div>';
+                    }
+                },
+                {
+                    "data": "customer.group.center.center_name",
+                    "render": function(data, type, row) {
+                        let centerName = (row.customer && row.customer.group && row.customer.group.center) ? row.customer.group.center.center_name : '—';
+                        return '<span class="text-muted">' + centerName + '</span>';
+                    }
+                },
+                {
+                    "data": "agent.name",
+                    "render": function(data, type, row) {
+                        let agentName = (row.agent && row.agent.name) ? row.agent.name : '—';
+                        return '<span class="text-muted">' + agentName + '</span>';
+                    }
+                },
+                {
+                    "data": "applied_amount",
+                    "className": "text-right",
+                    "render": function(data, type, row) {
+                        let amount = parseFloat(data || 0).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+                        return '<span class="font-medium text-slate-800">₹' + amount + '</span>';
+                    }
+                },
+                {
+                    "data": "stage",
+                    "className": "text-center",
+                    "render": function(data, type, row) {
+                        let badgeClass = data === 'approved' ? 'std' : (data === 'rejected' ? 'npa' : 'sma0');
+                        let label = row.stage_label || data;
+                        return '<span class="badge-' + badgeClass + '">' + label + '</span>';
+                    }
+                },
+                {
+                    "data": "documents",
+                    "className": "text-center text-sm",
+                    "render": function(data, type, row) {
+                        let docs = data || [];
+                        let totalDocs = docs.length;
+                        let verifiedDocs = docs.filter(d => d.verification_status === 'verified').length;
+                        let colorClass = (verifiedDocs === totalDocs && totalDocs > 0) ? 'text-emerald' : 'text-muted';
+                        return '<span class="' + colorClass + '">' + verifiedDocs + '/' + totalDocs + '</span>';
+                    }
+                },
+                {
+                    "data": "created_at",
+                    "className": "text-muted",
+                    "render": function(data, type, row) {
+                        if (!data) return '';
+                        let d = new Date(data);
+                        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                    }
+                },
+                {
+                    "data": "stage",
+                    "className": "text-center",
+                    "orderable": false,
+                    "render": function(data, type, row) {
+                        if (['submitted', 'under_review'].includes(data)) {
+                            return '<a href="/los/applications/' + row.id + '/review" class="btn-primary-sm" style="display:inline-block; padding: 4px 12px; font-size: 12px; text-decoration:none;">Review →</a>';
+                        } else if (data === 'approved') {
+                            return '<span class="text-emerald text-xs font-medium">Disbursed</span>';
+                        } else if (data === 'rejected') {
+                            let reason = row.rejection_reason ? row.rejection_reason.replace(/"/g, '&quot;') : '';
+                            return '<span class="text-rose text-xs font-medium" title="' + reason + '">Declined</span>';
+                        }
+                        return '<span class="text-muted">—</span>';
+                    }
+                }
+            ],
             pageLength: 20,
             ordering: true,
-            language: { search: "🔍 Filter:", emptyTable: "No applications match the filter" }
+            order: [[ 7, "desc" ]],
+            language: { 
+                search: "", 
+                searchPlaceholder: "🔍 Filter...",
+                emptyTable: "No applications match the filter" 
+            }
         });
     }
 });

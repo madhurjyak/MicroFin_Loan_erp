@@ -25,6 +25,7 @@ Route::middleware('auth')->group(function () {
     // ── LMS: Loan Management System — All Roles ───────────────────────────
     Route::prefix('lms')->name('lms.')->group(function () {
         Route::get('/cds', [LmsController::class, 'cds'])->name('cds');
+        Route::get('/cds/data', [LmsController::class, 'cdsData'])->name('cds.data');
         Route::post('/cds/bulk-settle', [LmsController::class, 'bulkSettle'])->name('cds.bulk-settle');
         Route::get('/loans/{id}', [LoanController::class, 'show'])->name('loans.show');
         Route::post('/loans/{id}/collect', [LoanController::class, 'collect'])->name('loans.collect');
@@ -48,6 +49,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/apply', [LosController::class, 'apply'])->name('apply');
         Route::post('/apply', [LosController::class, 'store'])->name('store');
         Route::get('/my-applications', [LosController::class, 'myApplications'])->name('my-applications');
+        Route::get('/my-applications/data', [LosController::class, 'myApplicationsData'])->name('my-applications.data');
         Route::get('/center', [LosController::class, 'center'])->name('center');
         Route::get('/center/data', [LosController::class, 'centerData'])->name('center.data');
         Route::post('/center', [LosController::class, 'storeCenter'])->name('center.store');
@@ -68,6 +70,7 @@ Route::middleware('auth')->group(function () {
     // ── LOS: Loan Origination — Manager Routes ───────────────────────────
     Route::prefix('los')->name('los.')->middleware('role:manager,admin')->group(function () {
         Route::get('/pipeline', [LosController::class, 'pipeline'])->name('pipeline');
+        Route::get('/pipeline/data', [LosController::class, 'pipelineData'])->name('pipeline.data');
         Route::get('/applications/{id}/review', [LosController::class, 'review'])->name('review');
         Route::post('/applications/{id}/approve', [LosController::class, 'approve'])->name('approve');
         Route::post('/applications/{id}/reject', [LosController::class, 'reject'])->name('reject');

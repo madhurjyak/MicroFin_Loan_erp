@@ -3,16 +3,6 @@
 @section('page-title', '📋 My Loan Applications')
 
 @section('content')
-@php
-    function inrApp(float $a): string {
-        $a = round($a,2); $p = explode('.', number_format($a, 2));
-        $int = str_replace(',', '', $p[0]); $dec = $p[1];
-        if (strlen($int) <= 3) return '₹' . $int . '.' . $dec;
-        $last3 = substr($int, -3); $rest = substr($int, 0, strlen($int) - 3);
-        $rest = preg_replace('/\B(?=(\d{2})+(?!\d))/', ',', $rest);
-        return '₹' . $rest . ',' . $last3 . '.' . $dec;
-    }
-@endphp
 
 {{-- ── Quick Stats ── --}}
 <div class="dashboard-kpi-grid">
@@ -43,12 +33,6 @@
         </a>
     </div>
 
-    @if($applications->isEmpty())
-    <div class="empty-state" style="padding: 40px 20px; text-align: center;">
-        <p style="font-size: 18px; margin-bottom: 8px;">📝 No applications yet</p>
-        <a href="{{ route('los.apply') }}" class="text-link">File your first loan application →</a>
-    </div>
-    @else
     <div class="table-responsive">
         <table id="myAppsTable" class="data-table">
             <thead>
@@ -63,53 +47,126 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach($applications as $app)
-                <tr>
-                    <td class="font-mono font-medium" style="color: var(--brand-600);">{{ $app->application_no }}</td>
-                    <td>
-                        <div class="font-medium text-slate-800">{{ $app->customer->full_name }}</div>
-                        <div class="text-muted">{{ $app->customer->masked_aadhaar }}</div>
-                    </td>
-                    <td class="text-muted">
-                        {{ $app->customer->group->center->center_name ?? '—' }}
-                    </td>
-                    <td class="text-right font-medium text-slate-800">
-                        {!! inrApp((float)$app->applied_amount) !!}
-                    </td>
-                    <td class="text-center text-muted">
-                        {{ $app->tenure }} {{ $app->repayment_frequency === 'weekly' ? 'wks' : 'mo' }}
-                    </td>
-                    <td class="text-center">
-                        <span class="badge-{{ $app->stage === 'approved' ? 'std' : ($app->stage === 'rejected' ? 'npa' : 'sma0') }}">
-                            {{ $app->stage_label }}
-                        </span>
-                        @if($app->stage === 'rejected' && $app->rejection_reason)
-                        <p class="text-rose text-muted mt-1" style="max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ $app->rejection_reason }}">
-                            {{ $app->rejection_reason }}
-                        </p>
-                        @endif
-                    </td>
-                    <td class="text-muted">{{ $app->created_at->format('d M Y') }}</td>
-                </tr>
-                @endforeach
+                <!-- Data will be loaded via AJAX -->
             </tbody>
         </table>
     </div>
-    @endif
 </div>
 
 @push('scripts')
-@if($applications->isNotEmpty())
+<style>
+/* ── DataTable Polish ── */
+.dataTables_wrapper { margin-top: 12px; }
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter { margin-bottom: 16px; font-size: 13px; color: var(--text-secondary); }
+.dataTables_wrapper .dataTables_filter input {
+    border: 1px solid var(--border-light); border-radius: 12px; padding: 8px 16px;
+    font-family: inherit; font-size: 13px; background: var(--surface-light);
+    outline: none; margin-left: 8px; transition: var(--transition-smooth);
+}
+.dataTables_wrapper .dataTables_filter input:focus {
+    border-color: var(--brand-500); box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
+}
+.dataTables_wrapper .dataTables_length select {
+    border: 1px solid var(--border-light); border-radius: 8px; padding: 6px 12px;
+    font-family: inherit; font-size: 13px; margin: 0 4px; background: var(--surface-light);
+}
+.dataTables_wrapper .dataTables_info { font-size: 13px; color: var(--text-tertiary); padding-top: 16px; }
+.dataTables_wrapper .dataTables_paginate { padding-top: 16px; }
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    border-radius: 8px !important; border: 1px solid transparent !important;
+    font-size: 13px !important; font-weight: 500 !important; padding: 6px 12px !important;
+    color: var(--text-secondary) !important; transition: var(--transition-smooth);
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    background: var(--brand-50) !important; color: var(--brand-600) !important;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button.current,
+.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+    background: var(--brand-600) !important; color: white !important;
+    box-shadow: 0 2px 6px rgba(29, 78, 216, 0.3) !important;
+}
+</style>
 <script>
 $(document).ready(function() {
     $('#myAppsTable').DataTable({
-        pageLength: 15,
-        ordering: true,
-        responsive: true,
-        language: { search: "🔍 Filter:", emptyTable: "No applications found" }
+        "processing": true,
+        "serverSide": false,
+        "ajax": {
+            "url": "{{ route('los.my-applications.data') }}",
+            "type": "GET"
+        },
+        "columns": [
+            {
+                "data": "application_no",
+                "render": function(data, type, row) {
+                    return '<span class="font-mono font-medium" style="color: var(--brand-600);">' + (data || '') + '</span>';
+                }
+            },
+            {
+                "data": "customer.full_name",
+                "render": function(data, type, row) {
+                    let name = data || '—';
+                    let aadhaar = (row.customer && row.customer.masked_aadhaar) ? row.customer.masked_aadhaar : '';
+                    return '<div class="font-medium text-slate-800">' + name + '</div>' +
+                           '<div class="text-muted">' + aadhaar + '</div>';
+                }
+            },
+            {
+                "data": "customer.group.center.center_name",
+                "render": function(data, type, row) {
+                    return '<span class="text-muted">' + (data || '—') + '</span>';
+                }
+            },
+            {
+                "data": "applied_amount",
+                "className": "text-right",
+                "render": function(data, type, row) {
+                    let amount = parseFloat(data || 0).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+                    return '<span class="font-medium text-slate-800">₹' + amount + '</span>';
+                }
+            },
+            {
+                "data": "tenure",
+                "className": "text-center text-muted",
+                "render": function(data, type, row) {
+                    let freq = row.repayment_frequency === 'weekly' ? 'wks' : 'mo';
+                    return (data || '0') + ' ' + freq;
+                }
+            },
+            {
+                "data": "stage",
+                "className": "text-center",
+                "render": function(data, type, row) {
+                    let badgeClass = data === 'approved' ? 'std' : (data === 'rejected' ? 'npa' : 'sma0');
+                    let label = row.stage_label || data;
+                    let html = '<span class="badge-' + badgeClass + '">' + label + '</span>';
+                    if (data === 'rejected' && row.rejection_reason) {
+                        let reason = row.rejection_reason.replace(/"/g, '&quot;');
+                        html += '<p class="text-rose text-muted mt-1" style="max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 4px auto 0;" title="' + reason + '">' + reason + '</p>';
+                    }
+                    return html;
+                }
+            },
+            {
+                "data": "created_at",
+                "className": "text-muted",
+                "render": function(data, type, row) {
+                    if (!data) return '';
+                    let d = new Date(data);
+                    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                }
+            }
+        ],
+        "order": [[ 6, "desc" ]],
+        "pageLength": 15,
+        "language": {
+            "search": "",
+            "searchPlaceholder": "🔍 Filter...",
+            "emptyTable": '<div class="empty-state" style="padding: 40px 20px; text-align: center;"><p style="font-size: 18px; margin-bottom: 8px;">📝 No applications yet</p><a href="{{ route("los.apply") }}" class="text-link">File your first loan application →</a></div>'
+        }
     });
 });
 </script>
-@endif
 @endpush
 @endsection

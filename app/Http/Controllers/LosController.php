@@ -368,12 +368,48 @@ class LosController extends Controller
         return view('los.my_applications', compact('applications', 'stats'));
     }
 
+    /**
+     * GET /los/my-applications/data — Get agent's applications data via AJAX
+     */
+    public function myApplicationsData(Request $request)
+    {
+        $applications = LoanApplication::with(['customer.group.center'])
+            ->where('agent_id', auth()->id())
+            ->orderByDesc('created_at')
+            ->get();
+
+        $applications->each(function($app) {
+            $app->append('stage_label');
+            if ($app->customer) {
+                $app->customer->append('masked_aadhaar');
+            }
+        });
+
+        return response()->json([
+            'data' => $applications
+        ]);
+    }
+
     // ── Manager: Pipeline Dashboard ────────────────────────────────────
 
     /**
      * GET /los/pipeline — Manager pipeline view
      */
     public function pipeline(Request $request)
+    {
+        $stageFilter = $request->input('stage', 'all');
+
+        $stageCounts = LoanApplication::selectRaw('stage, COUNT(*) as cnt')
+            ->groupBy('stage')
+            ->pluck('cnt', 'stage');
+
+        return view('los.pipeline', compact('stageFilter', 'stageCounts'));
+    }
+
+    /**
+     * GET /los/pipeline/data
+     */
+    public function pipelineData(Request $request)
     {
         $stageFilter = $request->input('stage', 'all');
 
@@ -384,13 +420,17 @@ class LosController extends Controller
             $query->where('stage', $stageFilter);
         }
 
-        $applications = $query->paginate(20)->withQueryString();
+        $applications = $query->get();
+        $applications->each(function($app) {
+            $app->append('stage_label');
+            if ($app->customer) {
+                $app->customer->append('masked_aadhaar');
+            }
+        });
 
-        $stageCounts = LoanApplication::selectRaw('stage, COUNT(*) as cnt')
-            ->groupBy('stage')
-            ->pluck('cnt', 'stage');
-
-        return view('los.pipeline', compact('applications', 'stageFilter', 'stageCounts'));
+        return response()->json([
+            'data' => $applications
+        ]);
     }
 
     // ── Manager: Review Docket ─────────────────────────────────────────

@@ -107,6 +107,89 @@ class LmsController extends Controller
     }
 
     /**
+     * GET: Fetch unified CDS data via AJAX
+     */
+    public function cdsData(Request $request)
+    {
+        $centerId = $request->input('center_id');
+        
+        if (!$centerId) {
+            return response()->json(['data' => []]);
+        }
+
+        $center = Center::with([
+            'groups.customers' => function ($q) {
+                $q->with([
+                    'loans' => function ($lq) {
+                        $lq->whereIn('status', ['active', 'npa'])
+                           ->with(['repaymentSchedules' => function ($rq) {
+                               $rq->whereIn('status', ['overdue', 'partial', 'pending'])
+                                  ->orderBy('installment_no');
+                           }]);
+                    },
+                    'savingsAccounts' => function ($sq) {
+                        $sq->where('status', 'active')
+                           ->with(['schedules' => function ($ss) {
+                               $ss->whereIn('status', ['pending', 'partial', 'missed'])
+                                  ->orderBy('installment_no');
+                           }]);
+                    },
+                ]);
+            }
+        ])->find($centerId);
+
+        if (!$center) {
+            return response()->json(['data' => []]);
+        }
+
+        $data = [];
+        foreach ($center->groups as $group) {
+            foreach ($group->customers as $customer) {
+                $loanDue = 0;
+                $penalDue = 0;
+                $loanHasOverdue = false;
+
+                if ($customer->loans->count()) {
+                    $loan = $customer->loans->first();
+                    if ($loan->repaymentSchedules->count()) {
+                        $ls = $loan->repaymentSchedules->first();
+                        $loanDue = (float)$ls->principal_due + (float)$ls->interest_due - (float)$ls->total_paid;
+                        $penalDue = (float)$ls->penal_charges_due + (float)$ls->penal_gst_due;
+                        $loanHasOverdue = $ls->status === 'overdue';
+                    }
+                }
+
+                $rdDue = 0;
+                if ($customer->savingsAccounts->count()) {
+                    $savings = $customer->savingsAccounts->first();
+                    if ($savings->schedules->count()) {
+                        $ss = $savings->schedules->first();
+                        $rdDue = (float)$ss->amount_expected - (float)$ss->amount_collected;
+                    }
+                }
+
+                $totalDue = $loanDue + $penalDue + $rdDue;
+
+                $data[] = [
+                    'id' => $customer->id,
+                    'customer_name' => $customer->full_name,
+                    'customer_code' => $customer->customer_code,
+                    'group_name' => $group->group_name,
+                    'leader_name' => $group->group_leader_name,
+                    'is_leader' => $customer->full_name === $group->group_leader_name,
+                    'loan_due' => $loanDue,
+                    'penal_due' => $penalDue,
+                    'loan_has_overdue' => $loanHasOverdue,
+                    'rd_due' => $rdDue,
+                    'total_due' => $totalDue
+                ];
+            }
+        }
+
+        return response()->json(['data' => $data]);
+    }
+
+    /**
      * POST: Bulk CDS settlement — applies both loan EMI + RD deposit in one transaction.
      */
     public function bulkSettle(Request $request)

@@ -78,22 +78,12 @@
     </div>
 </div>
 
-@foreach($groups as $group)
 <div class="panel mb-4" style="padding: 0; overflow: hidden;">
-    <!-- Group Header -->
-    <div style="background: var(--bg-primary); border-bottom: 1px solid var(--border-light); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between;">
-        <div>
-            <span style="font-weight: 600; color: var(--text-primary);">{{ $group->group_name }}</span>
-            <span class="text-muted" style="margin-left: 8px;">Leader: {{ $group->group_leader_name }}</span>
-        </div>
-        <span class="text-muted">{{ $group->customers->count() }} members</span>
-    </div>
-
     <div class="table-responsive">
-        <table class="data-table">
+        <table id="cdsTable" class="data-table" style="width: 100%;">
             <thead>
                 <tr style="background: rgba(15, 23, 42, 0.02);">
-                    <th class="text-left" style="padding-left: 20px;">#</th>
+                    <th class="text-left" style="padding-left: 20px;">Group</th>
                     <th class="text-left">Member</th>
                     <th class="text-right">Loan EMI + Penal</th>
                     <th class="text-right">RD Savings</th>
@@ -102,70 +92,10 @@
                 </tr>
             </thead>
             <tbody>
-            @foreach($group->customers as $idx => $customer)
-                @php
-                    $loan = $customer->loans->first();
-                    $savings = $customer->savingsAccounts->first();
-
-                    $loanDue = 0; $penalDue = 0; $loanHasOverdue = false;
-                    if ($loan && $loan->repaymentSchedules->count()) {
-                        $ls = $loan->repaymentSchedules->first();
-                        $loanDue = (float)$ls->principal_due + (float)$ls->interest_due - (float)$ls->total_paid;
-                        $penalDue = (float)$ls->penal_charges_due + (float)$ls->penal_gst_due;
-                        $loanHasOverdue = $ls->status === 'overdue';
-                    }
-
-                    $rdDue = 0;
-                    if ($savings && $savings->schedules->count()) {
-                        $ss = $savings->schedules->first();
-                        $rdDue = (float)$ss->amount_expected - (float)$ss->amount_collected;
-                    }
-
-                    $totalDue = $loanDue + $penalDue + $rdDue;
-                    $isLeader = $customer->full_name === $group->group_leader_name;
-                    $rowId = 'row-cust-' . $customer->id;
-                @endphp
-                <tr id="{{ $rowId }}" style="{{ $loanHasOverdue ? 'background-color: #fff1f2;' : '' }}">
-                    <td class="text-muted" style="padding-left: 20px;">{{ $idx + 1 }}</td>
-                    <td>
-                        <span class="font-medium text-slate-800">{{ $customer->full_name }}</span>
-                        @if($isLeader) <span style="background: var(--brand-100); color: var(--brand-700); font-size:10px; padding:2px 6px; border-radius:4px; font-weight:600; margin-left:4px;">GL</span> @endif
-                        <span style="display: block; font-size: 11px; color: var(--text-tertiary);">{{ $customer->customer_code }}</span>
-                    </td>
-                    <td class="text-right">
-                        @if($loanDue > 0 || $penalDue > 0)
-                            <span class="font-semibold" style="color:var(--text-primary);">{{ inrFmt($loanDue) }}</span>
-                            @if($penalDue > 0) <span style="color:#ef4444; font-size:.8rem; display:block;">+ {{ inrFmt($penalDue) }} (Penal)</span> @endif
-                        @else
-                            <span class="text-muted">—</span>
-                        @endif
-                    </td>
-                    <td class="text-right">
-                        @if($rdDue > 0)
-                            <span class="font-semibold text-emerald">{{ inrFmt($rdDue) }}</span>
-                        @else
-                            <span class="text-muted">—</span>
-                        @endif
-                    </td>
-                    <td class="text-right font-bold" style="font-size:1.05rem;">{{ inrFmt($totalDue) }}</td>
-                    <td class="text-right" style="padding-right: 20px;">
-                        @if($totalDue > 0)
-                        <button onclick="openSettleModal({{ $customer->id }}, '{{ addslashes($customer->full_name) }}', {{ $loanDue + $penalDue }}, {{ $rdDue }})"
-                            class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; border-radius: 6px; font-weight: 600; transition: all 0.2s; box-shadow: 0 2px 4px rgba(14,165,233,0.2);">Collect</button>
-                        @else
-                        <span style="color:#10b981; font-weight:600; font-size:.85rem; display: inline-flex; align-items: center; gap: 4px;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                            Cleared
-                        </span>
-                        @endif
-                    </td>
-                </tr>
-            @endforeach
             </tbody>
         </table>
     </div>
 </div>
-@endforeach
 
 @else
 <div class="empty-state" style="border: 1px dashed var(--border-light); border-radius: var(--border-radius-xl); padding: 64px 20px;">
@@ -229,7 +159,148 @@
 @endsection
 
 @push('scripts')
+<style>
+/* ── DataTable Polish ── */
+.dataTables_wrapper { margin-top: 12px; }
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter { margin-bottom: 16px; font-size: 13px; color: var(--text-secondary); padding: 0 20px; }
+.dataTables_wrapper .dataTables_filter input {
+    border: 1px solid var(--border-light); border-radius: 12px; padding: 8px 16px;
+    font-family: inherit; font-size: 13px; background: var(--surface-light);
+    outline: none; margin-left: 8px; transition: var(--transition-smooth);
+}
+.dataTables_wrapper .dataTables_filter input:focus {
+    border-color: var(--brand-500); box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
+}
+.dataTables_wrapper .dataTables_length select {
+    border: 1px solid var(--border-light); border-radius: 8px; padding: 6px 12px;
+    font-family: inherit; font-size: 13px; margin: 0 4px; background: var(--surface-light);
+}
+.dataTables_wrapper .dataTables_info { font-size: 13px; color: var(--text-tertiary); padding: 16px 20px; }
+.dataTables_wrapper .dataTables_paginate { padding: 16px 20px; }
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    border-radius: 8px !important; border: 1px solid transparent !important;
+    font-size: 13px !important; font-weight: 500 !important; padding: 6px 12px !important;
+    color: var(--text-secondary) !important; transition: var(--transition-smooth);
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    background: var(--brand-50) !important; color: var(--brand-600) !important;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button.current,
+.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+    background: var(--brand-600) !important; color: white !important;
+    box-shadow: 0 2px 6px rgba(29, 78, 216, 0.3) !important;
+}
+.group-header {
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border-light);
+    border-top: 1px solid var(--border-light);
+    font-weight: 600;
+    color: var(--text-primary);
+    padding: 12px 20px !important;
+}
+</style>
 <script>
+@if($selectedCenter)
+$(document).ready(function() {
+    let fmt = (amt) => '₹' + parseFloat(amt || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    
+    $('#cdsTable').DataTable({
+        "processing": true,
+        "serverSide": false,
+        "ajax": {
+            "url": "{{ route('lms.cds.data', ['center_id' => request('center_id'), 'collection_date' => request('collection_date')]) }}",
+            "type": "GET"
+        },
+        "pageLength": 50,
+        "ordering": false,
+        "language": {
+            "search": "",
+            "searchPlaceholder": "🔍 Search Member...",
+            "emptyTable": "No members found for this center."
+        },
+        "columns": [
+            { "data": "group_name", "visible": false },
+            {
+                "data": "customer_name",
+                "render": function(data, type, row) {
+                    let gl = row.is_leader ? '<span style="background: var(--brand-100); color: var(--brand-700); font-size:10px; padding:2px 6px; border-radius:4px; font-weight:600; margin-left:4px;">GL</span>' : '';
+                    return '<span class="font-medium text-slate-800">' + data + '</span>' + gl +
+                           '<span style="display: block; font-size: 11px; color: var(--text-tertiary);">' + (row.customer_code || '') + '</span>';
+                }
+            },
+            {
+                "data": "loan_due",
+                "className": "text-right",
+                "render": function(data, type, row) {
+                    let ld = parseFloat(row.loan_due || 0);
+                    let pd = parseFloat(row.penal_due || 0);
+                    if (ld > 0 || pd > 0) {
+                        let html = '<span class="font-semibold" style="color:var(--text-primary);">' + fmt(ld) + '</span>';
+                        if (pd > 0) html += '<span style="color:#ef4444; font-size:.8rem; display:block;">+ ' + fmt(pd) + ' (Penal)</span>';
+                        return html;
+                    }
+                    return '<span class="text-muted">—</span>';
+                }
+            },
+            {
+                "data": "rd_due",
+                "className": "text-right",
+                "render": function(data, type, row) {
+                    let rd = parseFloat(row.rd_due || 0);
+                    if (rd > 0) return '<span class="font-semibold text-emerald">' + fmt(rd) + '</span>';
+                    return '<span class="text-muted">—</span>';
+                }
+            },
+            {
+                "data": "total_due",
+                "className": "text-right font-bold",
+                "render": function(data, type, row) {
+                    return '<span style="font-size:1.05rem;">' + fmt(row.total_due) + '</span>';
+                }
+            },
+            {
+                "data": "total_due",
+                "className": "text-right",
+                "render": function(data, type, row) {
+                    if (parseFloat(row.total_due || 0) > 0) {
+                        let ld = parseFloat(row.loan_due || 0) + parseFloat(row.penal_due || 0);
+                        let rd = parseFloat(row.rd_due || 0);
+                        let nameEscaped = row.customer_name.replace(/'/g, "\\'");
+                        return `<button onclick="openSettleModal(${row.id}, '${nameEscaped}', ${ld}, ${rd})" class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; border-radius: 6px; font-weight: 600; transition: all 0.2s; box-shadow: 0 2px 4px rgba(14,165,233,0.2);">Collect</button>`;
+                    }
+                    return '<span style="color:#10b981; font-weight:600; font-size:.85rem; display: inline-flex; align-items: center; gap: 4px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Cleared</span>';
+                }
+            }
+        ],
+        "createdRow": function(row, data, dataIndex) {
+            row.id = 'row-cust-' + data.id;
+            if (data.loan_has_overdue) {
+                $(row).css('background-color', '#fff1f2');
+            }
+        },
+        "drawCallback": function (settings) {
+            let api = this.api();
+            let rows = api.rows({page:'current'}).nodes();
+            let last = null;
+ 
+            api.column(0, {page:'current'}).data().each(function (group, i) {
+                if (last !== group) {
+                    // Find the leader for this group from the data
+                    let rowData = api.row(rows[i]).data();
+                    let leaderStr = rowData.leader_name ? `<span class="text-muted" style="margin-left: 8px; font-weight: normal; font-size: 13px;">Leader: ${rowData.leader_name}</span>` : '';
+                    
+                    $(rows[i]).before(
+                        '<tr class="group"><td colspan="5" class="group-header">' + group + leaderStr + '</td></tr>'
+                    );
+                    last = group;
+                }
+            });
+        }
+    });
+});
+@endif
+
 function updateModalTotal() {
     let l = parseFloat(document.getElementById('modalLoanAmt').value) || 0;
     let s = parseFloat(document.getElementById('modalRdAmt').value) || 0;
