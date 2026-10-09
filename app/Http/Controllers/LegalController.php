@@ -32,6 +32,20 @@ class LegalController extends Controller
     }
 
     /**
+     * GET: Fetch legal notices data via AJAX
+     */
+    public function legalData(Request $request)
+    {
+        $notices = StatutoryNotice::with('loan.customer')
+            ->orderByDesc('dispatch_date')
+            ->get();
+
+        return response()->json([
+            'data' => $notices
+        ]);
+    }
+
+    /**
      * OTS Calculator — AJAX-friendly endpoint
      */
     public function otsCalculate(Request $request)

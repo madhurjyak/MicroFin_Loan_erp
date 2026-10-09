@@ -27,6 +27,20 @@ class AdminController extends Controller
     }
 
     /**
+     * GET /admin/users/data — Fetch staff data for DataTables
+     */
+    public function usersData()
+    {
+        $staff = User::orderByRaw("FIELD(role, 'admin', 'manager', 'agent')")
+            ->orderBy('name')
+            ->get();
+
+        return response()->json([
+            'data' => $staff
+        ]);
+    }
+
+    /**
      * POST /admin/users — Create new staff account
      */
     public function createUser(Request $request)

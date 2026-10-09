@@ -68,59 +68,12 @@
                 </tr>
             </thead>
             <tbody>
-                @forelse($cases as $case)
-                <tr>
-                    <td style="padding-left: 20px;">
-                        <p style="font-weight: 500; color: var(--text-primary); margin: 0; font-size: 14px;">{{ $case->loan->customer->full_name }}</p>
-                        <p style="font-size: 12px; color: var(--text-tertiary); margin: 0;">{{ $case->loan->customer->phone }}</p>
-                    </td>
-                    <td class="font-mono" style="font-size: 12px;">
-                        <a href="{{ route('lms.loans.show', $case->loan_id) }}" class="text-link">{{ $case->loan->loan_account_no }}</a>
-                    </td>
-                    <td class="text-muted" style="font-size: 12px;">{{ $case->loan->customer->group->center->center_name ?? '—' }}</td>
-                    <td class="text-center">
-                        <span style="font-size: 18px; font-weight: 700; color: {{ $case->dpd > 90 ? '#be123c' : ($case->dpd > 60 ? '#dc2626' : ($case->dpd > 30 ? '#ea580c' : '#ca8a04')) }};">
-                            {{ $case->dpd }}
-                        </span>
-                    </td>
-                    <td class="text-center">
-                        @php
-                            $badgeMap = ['Standard'=>'badge-std','SMA-0'=>'badge-sma0','SMA-1'=>'badge-sma1','SMA-2'=>'badge-sma2','NPA_SubStandard'=>'badge-npa','Doubtful'=>'badge-npa'];
-                            $bc = $badgeMap[$case->asset_classification] ?? 'badge-std';
-                        @endphp
-                        <span class="{{ $bc }}">{{ $case->asset_classification }}</span>
-                    </td>
-                    <td class="text-right font-bold" style="color: #be123c; font-size: 14px;">
-                        {{ inrR((float)$case->total_outstanding) }}
-                    </td>
-                    <td class="text-muted" style="font-size: 12px;">{{ $case->assigned_officer ?? '—' }}</td>
-                    <td class="text-muted" style="font-size: 12px;">
-                        {{ $case->last_contacted_at ? $case->last_contacted_at->format('d-M-Y H:i') : '—' }}
-                    </td>
-                    <td class="text-center" style="padding-right: 20px;">
-                        <button type="button" class="btn-log-case" data-case-id="{{ $case->id }}" style="font-size: 12px; background: var(--brand-100); color: var(--brand-700); padding: 4px 12px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; transition: var(--transition-smooth);">
-                            Log
-                        </button>
-                        @if(auth()->user()->hasRole('manager', 'admin'))
-                        <button type="button" class="btn-assign-case" data-case-id="{{ $case->id }}" style="font-size: 12px; background: #d1fae5; color: #047857; padding: 4px 12px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; margin-left: 4px; transition: var(--transition-smooth);">
-                            Assign
-                        </button>
-                        @endif
-                    </td>
-                </tr>
-                @empty
-                <tr><td colspan="9" class="empty-state">No cases in this bucket 🎉</td></tr>
-                @endforelse
+                <!-- AJAX Data -->
             </tbody>
         </table>
     </div>
 
-    <!-- Pagination -->
-    @if($cases->hasPages())
-    <div style="padding: 16px 20px; border-top: 1px solid var(--border-light);">
-        {{ $cases->links() }}
-    </div>
-    @endif
+    <!-- Pagination is handled by DataTables -->
 
 </div>
 
@@ -279,8 +232,165 @@
 .modal-overlay.show .modal-content {
     transform: scale(1);
 }
+
+/* ── DataTable Polish ── */
+.dataTables_wrapper { margin-top: 12px; }
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter { margin-bottom: 16px; font-size: 13px; color: var(--text-secondary); padding: 0 20px; }
+.dataTables_wrapper .dataTables_filter input {
+    border: 1px solid var(--border-light); border-radius: 12px; padding: 8px 16px;
+    font-family: inherit; font-size: 13px; background: var(--surface-light);
+    outline: none; margin-left: 8px; transition: var(--transition-smooth);
+}
+.dataTables_wrapper .dataTables_filter input:focus {
+    border-color: var(--brand-500); box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
+}
+.dataTables_wrapper .dataTables_length select {
+    border: 1px solid var(--border-light); border-radius: 8px; padding: 6px 12px;
+    font-family: inherit; font-size: 13px; margin: 0 4px; background: var(--surface-light);
+}
+.dataTables_wrapper .dataTables_info { font-size: 13px; color: var(--text-tertiary); padding: 16px 20px; }
+.dataTables_wrapper .dataTables_paginate { padding: 16px 20px; }
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    border-radius: 8px !important; border: 1px solid transparent !important;
+    font-size: 13px !important; font-weight: 500 !important; padding: 6px 12px !important;
+    color: var(--text-secondary) !important; transition: var(--transition-smooth);
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    background: var(--brand-50) !important; color: var(--brand-600) !important;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button.current,
+.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+    background: var(--brand-600) !important; color: white !important;
+    box-shadow: 0 2px 6px rgba(29, 78, 216, 0.3) !important;
+}
 </style>
 <script>
+$(document).ready(function() {
+    let fmt = (amt) => {
+        let a = parseFloat(amt || 0);
+        return '₹' + a.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    };
+
+    let table = $('.data-table').DataTable({
+        "processing": true,
+        "serverSide": false,
+        "ajax": {
+            "url": "{{ route('recovery.console.data', ['bucket' => $bucket]) }}",
+            "type": "GET"
+        },
+        "columns": [
+            {
+                "data": "loan.customer.full_name",
+                "render": function(data, type, row) {
+                    let phone = (row.loan && row.loan.customer && row.loan.customer.phone) ? row.loan.customer.phone : '';
+                    return `<div style="padding-left: 20px;">
+                                <p style="font-weight: 500; color: var(--text-primary); margin: 0; font-size: 14px;">${data}</p>
+                                <p style="font-size: 12px; color: var(--text-tertiary); margin: 0;">${phone}</p>
+                            </div>`;
+                }
+            },
+            {
+                "data": "loan.loan_account_no",
+                "className": "font-mono",
+                "render": function(data, type, row) {
+                    let url = "{{ route('lms.loans.show', ':id') }}".replace(':id', row.loan_id);
+                    return `<a href="${url}" class="text-link" style="font-size: 12px;">${data}</a>`;
+                }
+            },
+            {
+                "data": "loan.customer.group.center.center_name",
+                "className": "text-muted",
+                "render": function(data) { return `<span style="font-size: 12px;">${data || '—'}</span>`; }
+            },
+            {
+                "data": "dpd",
+                "className": "text-center",
+                "render": function(data) {
+                    let col = data > 90 ? '#be123c' : (data > 60 ? '#dc2626' : (data > 30 ? '#ea580c' : '#ca8a04'));
+                    return `<span style="font-size: 18px; font-weight: 700; color: ${col};">${data}</span>`;
+                }
+            },
+            {
+                "data": "asset_classification",
+                "className": "text-center",
+                "render": function(data) {
+                    let badgeMap = {'Standard':'badge-std','SMA-0':'badge-sma0','SMA-1':'badge-sma1','SMA-2':'badge-sma2','NPA_SubStandard':'badge-npa','Doubtful':'badge-npa'};
+                    let bc = badgeMap[data] || 'badge-std';
+                    return `<span class="${bc}">${data}</span>`;
+                }
+            },
+            {
+                "data": "total_outstanding",
+                "className": "text-right font-bold",
+                "render": function(data) {
+                    return `<span style="color: #be123c; font-size: 14px;">${fmt(data)}</span>`;
+                }
+            },
+            {
+                "data": "assigned_officer",
+                "className": "text-muted",
+                "render": function(data) { return `<span style="font-size: 12px;">${data || '—'}</span>`; }
+            },
+            {
+                "data": "last_contacted_at",
+                "className": "text-muted",
+                "render": function(data) {
+                    if(!data) return `<span style="font-size: 12px;">—</span>`;
+                    let d = new Date(data);
+                    let m = String(d.getMonth() + 1).padStart(2, '0');
+                    let dd = String(d.getDate()).padStart(2, '0');
+                    let y = d.getFullYear();
+                    let h = String(d.getHours()).padStart(2, '0');
+                    let min = String(d.getMinutes()).padStart(2, '0');
+                    return `<span style="font-size: 12px;">${dd}-${m}-${y} ${h}:${min}</span>`;
+                }
+            },
+            {
+                "data": "id",
+                "className": "text-center",
+                "render": function(data, type, row) {
+                    let isManager = {{ auth()->user()->hasRole('manager', 'admin') ? 'true' : 'false' }};
+                    let assignBtn = isManager ? `<button type="button" class="btn-assign-case" data-case-id="${data}" style="font-size: 12px; background: #d1fae5; color: #047857; padding: 4px 12px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; margin-left: 4px; transition: var(--transition-smooth);">Assign</button>` : '';
+                    
+                    return `<div style="padding-right: 20px;">
+                        <button type="button" class="btn-log-case" data-case-id="${data}" style="font-size: 12px; background: var(--brand-100); color: var(--brand-700); padding: 4px 12px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; transition: var(--transition-smooth);">Log</button>
+                        ${assignBtn}
+                    </div>`;
+                }
+            }
+        ],
+        "order": [[3, "desc"]],
+        "pageLength": 20,
+        "language": {
+            "search": "",
+            "searchPlaceholder": "🔍 Search cases...",
+            "emptyTable": "No cases in this bucket 🎉"
+        }
+    });
+
+    // Handle dynamically created buttons in DataTables
+    $('.data-table').on('click', '.btn-log-case', function() {
+        let id = $(this).data('case-id');
+        let logCaseSelect = document.getElementById('logCaseSelect');
+        let logModal = document.getElementById('logModal');
+        if(logCaseSelect) logCaseSelect.value = id;
+        logModal.style.display = 'flex';
+        void logModal.offsetWidth;
+        logModal.classList.add('show');
+    });
+
+    $('.data-table').on('click', '.btn-assign-case', function() {
+        let id = $(this).data('case-id');
+        let assignCaseIdInput = document.getElementById('assignCaseIdInput');
+        let assignModal = document.getElementById('assignModal');
+        if(assignCaseIdInput) assignCaseIdInput.value = id;
+        assignModal.style.display = 'flex';
+        void assignModal.offsetWidth;
+        assignModal.classList.add('show');
+    });
+});
+
 document.addEventListener('DOMContentLoaded', () => {
     const logModal = document.getElementById('logModal');
     const assignModal = document.getElementById('assignModal');

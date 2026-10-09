@@ -46,47 +46,11 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($notices as $notice)
-                        <tr>
-                            <td class="font-mono text-muted" style="font-size: 12px; padding-left: 20px;">{{ $notice->notice_ref_no }}</td>
-                            <td>
-                                @php
-                                    $noticeTypeColors = [
-                                        'Sec_138_NI_Act'               => 'badge-npa',
-                                        'Sec_25_PSSA_AutoDebit_Bounce' => 'badge-sma1',
-                                        'Loan_Recall_Notice'           => 'badge-sma0',
-                                        'SARFAESI_13_2'                => 'badge-npa',
-                                    ];
-                                @endphp
-                                <span class="{{ $noticeTypeColors[$notice->notice_type] ?? 'badge-std' }}">
-                                    {{ str_replace(['Sec_','_',' '],[' §',' ',' '],$notice->notice_type) }}
-                                </span>
-                            </td>
-                            <td style="font-weight: 500; color: var(--text-primary); font-size: 14px;">{{ $notice->loan->customer->full_name }}</td>
-                            <td class="font-mono text-muted" style="font-size: 12px;">{{ $notice->loan->loan_account_no }}</td>
-                            <td class="text-muted" style="font-size: 12px;">{{ $notice->dispatch_date->format('d-M-Y') }}</td>
-                            <td class="font-mono text-muted" style="font-size: 12px;">{{ $notice->tracking_speedpost_no ?? '—' }}</td>
-                            <td class="text-center">
-                                <span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
-                                    {{ $notice->status === 'served' ? 'background: #d1fae5; color: #047857;'
-                                        : ($notice->status === 'dispatched' ? 'background: #dbeafe; color: #1d4ed8;'
-                                        : 'background: var(--border-light); color: var(--text-secondary);') }}">
-                                    {{ ucfirst(str_replace('_',' ',$notice->status)) }}
-                                </span>
-                            </td>
-                            <td class="text-center" style="padding-right: 20px;">
-                                <a href="{{ route('recovery.legal.notice', $notice->id) }}" target="_blank" class="text-link" style="font-weight: 600;">🖨 Print</a>
-                            </td>
-                        </tr>
-                        @empty
-                        <tr><td colspan="8" class="empty-state">No statutory notices generated yet.</td></tr>
-                        @endforelse
+                        <!-- AJAX Data -->
                     </tbody>
                 </table>
             </div>
-            @if($notices->hasPages())
-            <div style="padding: 16px 20px; border-top: 1px solid var(--border-light);">{{ $notices->appends(['ots_page' => request('ots_page')])->links() }}</div>
-            @endif
+            <!-- Pagination is handled by DataTables -->
         </div>
     </div>
 
@@ -190,8 +154,122 @@
         grid-template-columns: 1fr !important;
     }
 }
+
+/* ── DataTable Polish ── */
+.dataTables_wrapper { margin-top: 12px; }
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter { margin-bottom: 16px; font-size: 13px; color: var(--text-secondary); padding: 0 20px; }
+.dataTables_wrapper .dataTables_filter input {
+    border: 1px solid var(--border-light); border-radius: 12px; padding: 8px 16px;
+    font-family: inherit; font-size: 13px; background: var(--surface-light);
+    outline: none; margin-left: 8px; transition: var(--transition-smooth);
+}
+.dataTables_wrapper .dataTables_filter input:focus {
+    border-color: var(--brand-500); box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
+}
+.dataTables_wrapper .dataTables_length select {
+    border: 1px solid var(--border-light); border-radius: 8px; padding: 6px 12px;
+    font-family: inherit; font-size: 13px; margin: 0 4px; background: var(--surface-light);
+}
+.dataTables_wrapper .dataTables_info { font-size: 13px; color: var(--text-tertiary); padding: 16px 20px; }
+.dataTables_wrapper .dataTables_paginate { padding: 16px 20px; }
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    border-radius: 8px !important; border: 1px solid transparent !important;
+    font-size: 13px !important; font-weight: 500 !important; padding: 6px 12px !important;
+    color: var(--text-secondary) !important; transition: var(--transition-smooth);
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    background: var(--brand-50) !important; color: var(--brand-600) !important;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button.current,
+.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+    background: var(--brand-600) !important; color: white !important;
+    box-shadow: 0 2px 6px rgba(29, 78, 216, 0.3) !important;
+}
 </style>
 <script>
+$(document).ready(function() {
+    let table = $('.data-table').DataTable({
+        "processing": true,
+        "serverSide": false,
+        "ajax": {
+            "url": "{{ route('recovery.legal.data') }}",
+            "type": "GET"
+        },
+        "columns": [
+            {
+                "data": "notice_ref_no",
+                "className": "font-mono text-muted",
+                "render": function(data) { return `<span style="font-size: 12px; padding-left: 20px;">${data}</span>`; }
+            },
+            {
+                "data": "notice_type",
+                "render": function(data) {
+                    let noticeTypeColors = {
+                        'Sec_138_NI_Act': 'badge-npa',
+                        'Sec_25_PSSA_AutoDebit_Bounce': 'badge-sma1',
+                        'Loan_Recall_Notice': 'badge-sma0',
+                        'SARFAESI_13_2': 'badge-npa'
+                    };
+                    let bc = noticeTypeColors[data] || 'badge-std';
+                    let formatted = data.replace(/Sec_/g, ' §').replace(/_/g, ' ');
+                    return `<span class="${bc}">${formatted}</span>`;
+                }
+            },
+            {
+                "data": "loan.customer.full_name",
+                "render": function(data) { return `<span style="font-weight: 500; color: var(--text-primary); font-size: 14px;">${data}</span>`; }
+            },
+            {
+                "data": "loan.loan_account_no",
+                "className": "font-mono text-muted",
+                "render": function(data) { return `<span style="font-size: 12px;">${data}</span>`; }
+            },
+            {
+                "data": "dispatch_date",
+                "className": "text-muted",
+                "render": function(data) {
+                    if(!data) return '';
+                    let d = new Date(data);
+                    let m = d.toLocaleString('default', { month: 'short' });
+                    let dd = String(d.getDate()).padStart(2, '0');
+                    let y = d.getFullYear();
+                    return `<span style="font-size: 12px;">${dd}-${m}-${y}</span>`;
+                }
+            },
+            {
+                "data": "tracking_speedpost_no",
+                "className": "font-mono text-muted",
+                "render": function(data) { return `<span style="font-size: 12px;">${data || '—'}</span>`; }
+            },
+            {
+                "data": "status",
+                "className": "text-center",
+                "render": function(data) {
+                    let bg = data === 'served' ? '#d1fae5' : (data === 'dispatched' ? '#dbeafe' : 'var(--border-light)');
+                    let col = data === 'served' ? '#047857' : (data === 'dispatched' ? '#1d4ed8' : 'var(--text-secondary)');
+                    let txt = data.charAt(0).toUpperCase() + data.slice(1).replace(/_/g, ' ');
+                    return `<span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; background: ${bg}; color: ${col};">${txt}</span>`;
+                }
+            },
+            {
+                "data": "id",
+                "className": "text-center",
+                "render": function(data) {
+                    let url = "{{ route('recovery.legal.notice', ':id') }}".replace(':id', data);
+                    return `<div style="padding-right: 20px;"><a href="${url}" target="_blank" class="text-link" style="font-weight: 600;">🖨 Print</a></div>`;
+                }
+            }
+        ],
+        "order": [[4, "desc"]],
+        "pageLength": 15,
+        "language": {
+            "search": "",
+            "searchPlaceholder": "🔍 Search notices...",
+            "emptyTable": "No statutory notices generated yet."
+        }
+    });
+});
 document.addEventListener('DOMContentLoaded', () => {
     // Tabs logic
     const tabBtns = document.querySelectorAll('.tab-btn');

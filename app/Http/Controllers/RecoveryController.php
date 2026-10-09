@@ -62,6 +62,34 @@ class RecoveryController extends Controller
     }
 
     /**
+     * GET: Fetch console data via AJAX
+     */
+    public function consoleData(Request $request)
+    {
+        $bucket = $request->input('bucket', 'all');
+        $user   = auth()->user();
+
+        $query = RecoveryCase::with([
+            'loan.customer.group.center',
+            'assignedOfficer',
+        ])->orderByDesc('dpd');
+
+        if ($user->isAgent()) {
+            $query->where('assigned_officer_id', $user->id);
+        }
+
+        if ($bucket !== 'all') {
+            $query->where('asset_classification', $bucket);
+        }
+
+        $cases = $query->get();
+
+        return response()->json([
+            'data' => $cases
+        ]);
+    }
+
+    /**
      * POST: Log a call or field visit
      * RBI Fair Practices Code: strictly reject contacts outside 08:00–19:00
      */

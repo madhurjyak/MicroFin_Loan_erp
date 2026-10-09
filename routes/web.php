@@ -80,12 +80,14 @@ Route::middleware('auth')->group(function () {
     // ── Recovery / DRMS — All Authenticated (controller handles role filtering) ──
     Route::prefix('recovery')->name('recovery.')->group(function () {
         Route::get('/console', [RecoveryController::class, 'console'])->name('console');
+        Route::get('/console/data', [RecoveryController::class, 'consoleData'])->name('console.data');
         Route::post('/log-contact', [RecoveryController::class, 'logContact'])->name('log-contact');
         Route::post('/assign-agent', [RecoveryController::class, 'assignAgent'])
             ->name('assign-agent')
             ->middleware('role:manager,admin');
 
         Route::get('/legal', [LegalController::class, 'index'])->name('legal');
+        Route::get('/legal/data', [LegalController::class, 'legalData'])->name('legal.data');
         Route::post('/legal/ots', [LegalController::class, 'otsCalculate'])->name('legal.ots');
         Route::get('/legal/notice/{id}', [LegalController::class, 'noticePreview'])->name('legal.notice');
     });
@@ -93,6 +95,7 @@ Route::middleware('auth')->group(function () {
     // ── Admin — Admin Only ────────────────────────────────────────────────
     Route::prefix('admin')->name('admin.')->middleware('role:admin')->group(function () {
         Route::get('/users', [AdminController::class, 'users'])->name('users');
+        Route::get('/users/data', [AdminController::class, 'usersData'])->name('users.data');
         Route::post('/users', [AdminController::class, 'createUser'])->name('users.create');
         Route::put('/users/{id}', [AdminController::class, 'updateUser'])->name('users.update');
         Route::delete('/users/{id}', [AdminController::class, 'deleteUser'])->name('users.destroy');

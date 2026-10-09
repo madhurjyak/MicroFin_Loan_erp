@@ -53,39 +53,7 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach($staff as $user)
-                <tr>
-                    <td style="padding-left: 24px;">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <div style="width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-                                {{ $user->role === 'admin' ? 'background: #f3e8ff;' : ($user->role === 'manager' ? 'background: #dbeafe;' : 'background: #d1fae5;') }}">
-                                <span style="font-weight: 700; font-size: 14px;
-                                    {{ $user->role === 'admin' ? 'color: #7e22ce;' : ($user->role === 'manager' ? 'color: #1d4ed8;' : 'color: #047857;') }}">
-                                    {{ strtoupper(substr($user->name, 0, 2)) }}
-                                </span>
-                            </div>
-                            <span style="font-size: 14px; font-weight: 500; color: var(--text-primary);">{{ $user->name }}</span>
-                        </div>
-                    </td>
-                    <td class="font-mono text-muted" style="font-size: 12px;">{{ $user->email }}</td>
-                    <td class="text-center">
-                        <span style="display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
-                            {{ $user->role === 'admin' ? 'background: #f3e8ff; color: #7e22ce;' : ($user->role === 'manager' ? 'background: #dbeafe; color: #1d4ed8;' : 'background: #d1fae5; color: #047857;') }}">
-                            {{ ucfirst($user->role) }}
-                        </span>
-                    </td>
-                    <td class="text-muted" style="font-size: 14px;">{{ $user->branch_name ?? '—' }}</td>
-                    <td class="text-muted" style="font-size: 14px;">{{ $user->created_at->format('d M Y') }}</td>
-                    <td class="text-center" style="padding-right: 24px; white-space: nowrap;">
-                        <button type="button" title="Edit" style="background: none; border: none; cursor: pointer; font-size: 16px; margin-right: 8px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'" onclick="openEditModal({{ $user->id }}, '{{ addslashes($user->name) }}', '{{ addslashes($user->email) }}', '{{ $user->role }}', '{{ addslashes($user->branch_name) }}')">✏️</button>
-                        <form action="{{ route('admin.users.destroy', $user->id) }}" method="POST" style="display:inline-block;" onsubmit="return confirm('Are you sure you want to delete this staff member?');">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" title="Delete" style="background: none; border: none; cursor: pointer; font-size: 16px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">🗑️</button>
-                        </form>
-                    </td>
-                </tr>
-                @endforeach
+                <!-- AJAX Data -->
             </tbody>
         </table>
     </div>
@@ -221,13 +189,125 @@
 .modal-overlay.show .modal-content {
     transform: scale(1);
 }
+
+/* ── DataTable Polish ── */
+.dataTables_wrapper { margin-top: 12px; }
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter { margin-bottom: 16px; font-size: 13px; color: var(--text-secondary); padding: 0 24px; }
+.dataTables_wrapper .dataTables_filter input {
+    border: 1px solid var(--border-light); border-radius: 12px; padding: 8px 16px;
+    font-family: inherit; font-size: 13px; background: var(--surface-light);
+    outline: none; margin-left: 8px; transition: var(--transition-smooth);
+}
+.dataTables_wrapper .dataTables_filter input:focus {
+    border-color: var(--brand-500); box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
+}
+.dataTables_wrapper .dataTables_length select {
+    border: 1px solid var(--border-light); border-radius: 8px; padding: 6px 12px;
+    font-family: inherit; font-size: 13px; margin: 0 4px; background: var(--surface-light);
+}
+.dataTables_wrapper .dataTables_info { font-size: 13px; color: var(--text-tertiary); padding: 16px 24px; }
+.dataTables_wrapper .dataTables_paginate { padding: 16px 24px; }
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    border-radius: 8px !important; border: 1px solid transparent !important;
+    font-size: 13px !important; font-weight: 500 !important; padding: 6px 12px !important;
+    color: var(--text-secondary) !important; transition: var(--transition-smooth);
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    background: var(--brand-50) !important; color: var(--brand-600) !important;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button.current,
+.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+    background: var(--brand-600) !important; color: white !important;
+    box-shadow: 0 2px 6px rgba(29, 78, 216, 0.3) !important;
+}
 </style>
 <script>
 $(document).ready(function() {
     $('#staffTable').DataTable({
-        pageLength: 20,
-        ordering: true,
-        language: { search: "🔍 Filter:", emptyTable: "No staff accounts found" }
+        "processing": true,
+        "serverSide": false,
+        "ajax": {
+            "url": "{{ route('admin.users.data') }}",
+            "type": "GET"
+        },
+        "columns": [
+            {
+                "data": "name",
+                "render": function(data, type, row) {
+                    let initials = data.substring(0, 2).toUpperCase();
+                    let bg, textCol;
+                    if(row.role === 'admin') { bg = '#f3e8ff'; textCol = '#7e22ce'; }
+                    else if(row.role === 'manager') { bg = '#dbeafe'; textCol = '#1d4ed8'; }
+                    else { bg = '#d1fae5'; textCol = '#047857'; }
+                    
+                    return `<div style="display: flex; align-items: center; gap: 12px; padding-left: 24px;">
+                            <div style="width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: ${bg};">
+                                <span style="font-weight: 700; font-size: 14px; color: ${textCol};">${initials}</span>
+                            </div>
+                            <span style="font-size: 14px; font-weight: 500; color: var(--text-primary);">${data}</span>
+                        </div>`;
+                }
+            },
+            {
+                "data": "email",
+                "className": "font-mono text-muted",
+                "render": function(data) { return `<span style="font-size: 12px;">${data}</span>`; }
+            },
+            {
+                "data": "role",
+                "className": "text-center",
+                "render": function(data) {
+                    let bg, textCol;
+                    if(data === 'admin') { bg = '#f3e8ff'; textCol = '#7e22ce'; }
+                    else if(data === 'manager') { bg = '#dbeafe'; textCol = '#1d4ed8'; }
+                    else { bg = '#d1fae5'; textCol = '#047857'; }
+                    
+                    return `<span style="display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; background: ${bg}; color: ${textCol};">${data.charAt(0).toUpperCase() + data.slice(1)}</span>`;
+                }
+            },
+            {
+                "data": "branch_name",
+                "className": "text-muted",
+                "render": function(data) { return `<span style="font-size: 14px;">${data || '—'}</span>`; }
+            },
+            {
+                "data": "created_at",
+                "className": "text-muted",
+                "render": function(data) {
+                    if(!data) return '';
+                    let d = new Date(data);
+                    return `<span style="font-size: 14px;">${d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>`;
+                }
+            },
+            {
+                "data": "id",
+                "className": "text-center",
+                "render": function(data, type, row) {
+                    let nameEscaped = row.name.replace(/'/g, "\\'");
+                    let emailEscaped = row.email.replace(/'/g, "\\'");
+                    let branchEscaped = (row.branch_name || '').replace(/'/g, "\\'");
+                    
+                    let deleteUrl = "{{ route('admin.users.destroy', ':id') }}".replace(':id', data);
+                    
+                    return `<div style="padding-right: 24px; white-space: nowrap;">
+                        <button type="button" title="Edit" style="background: none; border: none; cursor: pointer; font-size: 16px; margin-right: 8px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'" onclick="openEditModal(${data}, '${nameEscaped}', '${emailEscaped}', '${row.role}', '${branchEscaped}')">✏️</button>
+                        <form action="${deleteUrl}" method="POST" style="display:inline-block;" onsubmit="return confirm('Are you sure you want to delete this staff member?');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" title="Delete" style="background: none; border: none; cursor: pointer; font-size: 16px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">🗑️</button>
+                        </form>
+                    </div>`;
+                }
+            }
+        ],
+        "pageLength": 20,
+        "ordering": true,
+        "language": {
+            "search": "",
+            "searchPlaceholder": "🔍 Search staff...",
+            "emptyTable": "No staff accounts found"
+        }
     });
 });
 
